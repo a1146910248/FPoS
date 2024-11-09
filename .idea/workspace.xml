@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="ALL" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="b5d6fc8d-50c6-4d37-9b11-5bf580d2a98a" name="变更" comment="">
+      <change beforePath="$PROJECT_DIR$/cmd/dd/flags.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmd/dd/main" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmd/dd/main.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmd/dd2/flags.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmd/dd2/main.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmd/dd3/mian.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmd/flags.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmd/gossip.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmd/main.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmd/mdns.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/go.mod" beforeDir="false" afterPath="$PROJECT_DIR$/go.mod" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/go.sum" beforeDir="false" afterPath="$PROJECT_DIR$/go.sum" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/p2p/temp.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/types/temp.go" beforeDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Go File" />
+      </list>
+    </option>
+  </component>
+  <component name="GOROOT" url="file://$USER_HOME$/go/go1.23.2" />
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="MarkdownSettingsMigration">
+    <option name="stateVersion" value="1" />
+  </component>
+  <component name="ProjectId" id="2o5pEXAaJcMDqewHEVpZUMymB5f" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="1" id="Add" />
+  </component>
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "DefaultGoTemplateProperty": "Go File",
+    "RunOnceActivity.OpenProjectViewOnStart": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.go.formatter.settings.were.checked": "true",
+    "RunOnceActivity.go.migrated.go.modules.settings": "true",
+    "RunOnceActivity.go.modules.go.list.on.any.changes.was.set": "true",
+    "WebServerToolWindowFactoryState": "false",
+    "configurable..is.expanded": "false",
+    "configurable.GoLibrariesConfigurable.is.expanded": "true",
+    "go.import.settings.migrated": "true",
+    "last_opened_file_path": "/Users/suboheng/code_project/FPoS/cmd/dd2",
+    "node.js.detected.package.eslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "settings.editor.selected.configurable": "com.goide.configuration.GoLibrariesConfigurableProvider"
+  }
+}]]></component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/cmd/dd2" />
+    </key>
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/p2p" />
+      <recent name="$PROJECT_DIR$/cmd" />
+    </key>
+  </component>
+  <component name="RunManager" selected="Go 构建.Node1">
+    <configuration name="Node1" type="GoApplicationRunConfiguration" factoryName="Go Application" singleton="false" temporary="true">
+      <module name="FPoS" />
+      <working_directory value="$PROJECT_DIR$" />
+      <kind value="PACKAGE" />
+      <package value="FPoS/cmd" />
+      <directory value="$PROJECT_DIR$" />
+      <filePath value="$PROJECT_DIR$" />
+      <method v="2" />
+    </configuration>
+    <configuration name="Node2" type="GoApplicationRunConfiguration" factoryName="Go Application" temporary="true">
+      <module name="FPoS" />
+      <working_directory value="$PROJECT_DIR$" />
+      <envs>
+        <env name="BOOTSTRAP" value="true" />
+      </envs>
+      <kind value="PACKAGE" />
+      <package value="FPoS/cmd" />
+      <directory value="$PROJECT_DIR$" />
+      <filePath value="$PROJECT_DIR$" />
+      <method v="2" />
+    </configuration>
+    <configuration name="FPoS/cmd 中的 TestP2PBasicCommunication" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
+      <module name="FPoS" />
+      <working_directory value="$PROJECT_DIR$/cmd" />
+      <root_directory value="$PROJECT_DIR$" />
+      <kind value="PACKAGE" />
+      <package value="FPoS/cmd" />
+      <directory value="$PROJECT_DIR$" />
+      <filePath value="$PROJECT_DIR$" />
+      <framework value="gotest" />
+      <pattern value="^\QTestP2PBasicCommunication\E$" />
+      <method v="2" />
+    </configuration>
+    <configuration name="FPoS/cmd 中的 TestP2PLocalNetwork" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
+      <module name="FPoS" />
+      <working_directory value="$PROJECT_DIR$/cmd" />
+      <root_directory value="$PROJECT_DIR$" />
+      <kind value="PACKAGE" />
+      <package value="FPoS/cmd" />
+      <directory value="$PROJECT_DIR$" />
+      <filePath value="$PROJECT_DIR$" />
+      <framework value="gotest" />
+      <pattern value="^\QTestP2PLocalNetwork\E$" />
+      <method v="2" />
+    </configuration>
+    <configuration name="FPoS/cmd 中的 TestP2PPublicNetwork" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
+      <module name="FPoS" />
+      <working_directory value="$PROJECT_DIR$/cmd" />
+      <root_directory value="$PROJECT_DIR$" />
+      <kind value="PACKAGE" />
+      <package value="FPoS/cmd" />
+      <directory value="$PROJECT_DIR$" />
+      <filePath value="$PROJECT_DIR$" />
+      <framework value="gotest" />
+      <pattern value="^\QTestP2PPublicNetwork\E$" />
+      <method v="2" />
+    </configuration>
+    <configuration name="FPoS/cmd 中的 TestPeerDiscovery" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
+      <module name="FPoS" />
+      <working_directory value="$PROJECT_DIR$/cmd" />
+      <root_directory value="$PROJECT_DIR$" />
+      <kind value="PACKAGE" />
+      <package value="FPoS/cmd" />
+      <directory value="$PROJECT_DIR$" />
+      <filePath value="$PROJECT_DIR$" />
+      <framework value="gotest" />
+      <pattern value="^\QTestPeerDiscovery\E$" />
+      <method v="2" />
+    </configuration>
+    <list>
+      <item itemvalue="Go 构建.Node2" />
+      <item itemvalue="Go 构建.Node1" />
+      <item itemvalue="Go 测试.FPoS/cmd 中的 TestP2PBasicCommunication" />
+      <item itemvalue="Go 测试.FPoS/cmd 中的 TestP2PLocalNetwork" />
+      <item itemvalue="Go 测试.FPoS/cmd 中的 TestP2PPublicNetwork" />
+      <item itemvalue="Go 测试.FPoS/cmd 中的 TestPeerDiscovery" />
+    </list>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Go 构建.Node1" />
+        <item itemvalue="Go 构建.Node2" />
+        <item itemvalue="Go 测试.FPoS/cmd 中的 TestP2PPublicNetwork" />
+        <item itemvalue="Go 测试.FPoS/cmd 中的 TestP2PLocalNetwork" />
+        <item itemvalue="Go 测试.FPoS/cmd 中的 TestPeerDiscovery" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="应用程序级" UseSingleDictionary="true" transferred="true" />
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="VgoProject">
+    <settings-migrated>true</settings-migrated>
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="DlvLineBreakpoint">
+          <url>file://$PROJECT_DIR$/cmd/dd/main.go</url>
+          <line>100</line>
+          <option name="timeStamp" value="7" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="DlvLineBreakpoint">
+          <url>file://$PROJECT_DIR$/cmd/dd/flags.go</url>
+          <line>50</line>
+          <option name="timeStamp" value="8" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
+  </component>
+</project>

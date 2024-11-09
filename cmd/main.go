@@ -1,144 +1,86 @@
 package main
 
 import (
-	"bufio"
+	"FPoS/p2p"
 	"context"
-	"crypto/rand"
-	"flag"
 	"fmt"
 	"os"
-
-	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/libp2p/go-libp2p/core/network"
-	"github.com/libp2p/go-libp2p/core/protocol"
-
-	"github.com/multiformats/go-multiaddr"
+	"os/signal"
+	"syscall"
 )
 
-func handleStream(stream network.Stream) {
-	fmt.Println("Got a new stream!")
-
-	// Create a buffer stream for non-blocking read and write.
-	rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
-
-	go readData(rw)
-	go writeData(rw)
-
-	// 'stream' will stay open until you close it (or the other side closes it).
-}
-
-func readData(rw *bufio.ReadWriter) {
-	for {
-		str, err := rw.ReadString('\n')
-		if err != nil {
-			fmt.Println("Error reading from buffer")
-			panic(err)
-		}
-
-		if str == "" {
-			return
-		}
-		if str != "\n" {
-			// Green console colour: 	\x1b[32m
-			// Reset console colour: 	\x1b[0m
-			fmt.Printf("\x1b[32m%s\x1b[0m> ", str)
-		}
-
-	}
-}
-
-func writeData(rw *bufio.ReadWriter) {
-	stdReader := bufio.NewReader(os.Stdin)
-
-	for {
-		fmt.Print("> ")
-		sendData, err := stdReader.ReadString('\n')
-		if err != nil {
-			fmt.Println("Error reading from stdin")
-			panic(err)
-		}
-
-		_, err = rw.WriteString(fmt.Sprintf("%s\n", sendData))
-		if err != nil {
-			fmt.Println("Error writing to buffer")
-			panic(err)
-		}
-		err = rw.Flush()
-		if err != nil {
-			fmt.Println("Error flushing buffer")
-			panic(err)
-		}
-	}
-}
-
+//	func main() {
+//		ctx := context.Background()
+//
+//		// 创建Layer2节点
+//		node, err := p2p.NewLayer2Node(ctx, 6666)
+//		if err != nil {
+//			panic(err)
+//		}
+//
+//		// 设置交易处理器
+//		node.SetTransactionHandler(func(tx types.Transaction) bool {
+//			// 实现交易验证逻辑
+//			return true
+//		})
+//
+//		// 设置区块处理器
+//		node.SetBlockHandler(func(block types.Block) bool {
+//			// 实现区块验证逻辑
+//			return true
+//		})
+//
+//		// 启动节点
+//		if err := node.Start(); err != nil {
+//			panic(err)
+//		}
+//
+//		fmt.Printf("Layer2 节点已启动，地址: %s\n", node.Host().ID())
+//
+//		// 等待中断信号
+//		sigChan := make(chan os.Signal, 1)
+//		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+//		<-sigChan
+//	}
 func main() {
-	help := flag.Bool("help", false, "Display Help")
-	cfg := parseFlags()
-
-	if *help {
-		fmt.Printf("Simple example for peer discovery using mDNS. mDNS is great when you have multiple peers in local LAN.")
-		fmt.Printf("Usage: \n   Run './chat-with-mdns'\nor Run './chat-with-mdns -host [host] -port [port] -rendezvous [string] -pid [proto ID]'\n")
-
-		os.Exit(0)
-	}
-
-	fmt.Printf("[*] Listening on: %s with port: %d\n", cfg.listenHost, cfg.listenPort)
-
 	ctx := context.Background()
-	r := rand.Reader
+	isBootstrap := os.Getenv("BOOTSTRAP") == "true"
 
-	// Creates a new RSA key pair for this host.
-	prvKey, _, err := crypto.GenerateKeyPairWithReader(crypto.RSA, 2048, r)
-	if err != nil {
-		panic(err)
-	}
-
-	// 0.0.0.0 will listen on any interface device.
-	sourceMultiAddr, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d", cfg.listenHost, cfg.listenPort))
-
-	// libp2p.New constructs a new libp2p Host.
-	// Other options can be added here.
-	host, err := libp2p.New(
-		libp2p.ListenAddrs(sourceMultiAddr),
-		libp2p.Identity(prvKey),
-	)
-	if err != nil {
-		panic(err)
-	}
-
-	// Set a function as stream handler.
-	// This function is called when a peer initiates a connection and starts a stream with this peer.
-	host.SetStreamHandler(protocol.ID(cfg.ProtocolID), handleStream)
-
-	fmt.Printf("\n[*] Your Multiaddress Is: /ip4/%s/tcp/%v/p2p/%s\n", cfg.listenHost, cfg.listenPort, host.ID())
-
-	peerChan := initMDNS(host, cfg.RendezvousString)
-	for { // allows multiple peers to join
-		peer := <-peerChan // will block until we discover a peer
-		if peer.ID > host.ID() {
-			// if other end peer id greater than us, don't connect to it, just wait for it to connect us
-			fmt.Println("Found peer:", peer, " id is greater than us, wait for it to connect to us")
-			continue
-		}
-		fmt.Println("Found peer:", peer, ", connecting")
-
-		if err := host.Connect(ctx, peer); err != nil {
-			fmt.Println("Connection failed:", err)
-			continue
-		}
-
-		// open a stream, this stream will be handled by handleStream other end
-		stream, err := host.NewStream(ctx, peer.ID, protocol.ID(cfg.ProtocolID))
-
+	if isBootstrap {
+		// 启动引导节点
+		node, err := p2p.NewLayer2Node(ctx, 6666, nil)
 		if err != nil {
-			fmt.Println("Stream open failed", err)
-		} else {
-			rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
-
-			go writeData(rw)
-			go readData(rw)
-			fmt.Println("Connected to:", peer)
+			panic(err)
 		}
+		if err := node.Start(); err != nil {
+			panic(err)
+		}
+
+		// 保存引导节点信息
+		addr := node.GetAddrs()[0]
+		if err := p2p.SaveBootstrapInfo(addr); err != nil {
+			panic(err)
+		}
+		fmt.Printf("Bootstrap node started: %s\n", addr)
+	} else {
+		// 读取引导节点信息
+		bootstrapAddr, err := p2p.LoadBootstrapInfo()
+		if err != nil {
+			panic(err)
+		}
+
+		// 启动普通节点
+		node, err := p2p.NewLayer2Node(ctx, 6667, []string{bootstrapAddr})
+		if err != nil {
+			panic(err)
+		}
+		if err := node.Start(); err != nil {
+			panic(err)
+		}
+		fmt.Printf("Node started with bootstrap: %s\n", bootstrapAddr)
 	}
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	<-sigChan
 }
