@@ -70,7 +70,7 @@ func main() {
 		}
 
 		// 启动普通节点
-		node, err := p2p.NewLayer2Node(ctx, 6667, []string{bootstrapAddr})
+		node, err := p2p.NewLayer2Node(ctx, 0, []string{bootstrapAddr})
 		if err != nil {
 			panic(err)
 		}

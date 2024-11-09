@@ -5,20 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="b5d6fc8d-50c6-4d37-9b11-5bf580d2a98a" name="变更" comment="">
-      <change beforePath="$PROJECT_DIR$/cmd/dd/flags.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmd/dd/main" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmd/dd/main.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmd/dd2/flags.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmd/dd2/main.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmd/dd3/mian.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmd/flags.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmd/gossip.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmd/main.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmd/mdns.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/go.mod" beforeDir="false" afterPath="$PROJECT_DIR$/go.mod" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/go.sum" beforeDir="false" afterPath="$PROJECT_DIR$/go.sum" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/p2p/temp.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/types/temp.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/bootstrap.json" beforeDir="false" afterPath="$PROJECT_DIR$/bootstrap.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmd/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/cmd/main.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/p2p/node.go" beforeDir="false" afterPath="$PROJECT_DIR$/p2p/node.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/p2p/sync.go" beforeDir="false" afterPath="$PROJECT_DIR$/p2p/sync.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -74,7 +65,7 @@
       <recent name="$PROJECT_DIR$/cmd" />
     </key>
   </component>
-  <component name="RunManager" selected="Go 构建.Node1">
+  <component name="RunManager" selected="Go 构建.Node2">
     <configuration name="Node1" type="GoApplicationRunConfiguration" factoryName="Go Application" singleton="false" temporary="true">
       <module name="FPoS" />
       <working_directory value="$PROJECT_DIR$" />
@@ -184,5 +175,10 @@
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
+    <watches-manager>
+      <configuration name="GoApplicationRunConfiguration">
+        <watch expression="addrs" />
+      </configuration>
+    </watches-manager>
   </component>
 </project>
