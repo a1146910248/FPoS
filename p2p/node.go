@@ -52,12 +52,18 @@ func NewLayer2Node(ctx context.Context, port int, bootstrapPeers []string) (*Lay
 		return nil, err
 	}
 
-	kdht, err := dht.New(ctx, host, dht.Mode(dht.ModeServer))
+	kdht, err := dht.New(ctx, host,
+		dht.Mode(dht.ModeAutoServer),  // 使用自动服务器模式
+		dht.ProtocolPrefix("/layer2"), // 添加自定义协议前缀，隔离网络
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	ps, err := pubsub.NewGossipSub(ctx, host)
+	ps, err := pubsub.NewGossipSub(ctx, host,
+		pubsub.WithPeerExchange(true),             // 启用节点交换
+		pubsub.WithDirectPeers([]peer.AddrInfo{}), // 允许直接连接
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +143,6 @@ func (n *Layer2Node) Start() error {
 	if err := n.setupTopics(); err != nil {
 		return err
 	}
-
 	// 寻找网络中的其他节点
 	go n.discoverPeers()
 
@@ -162,25 +167,28 @@ func (n *Layer2Node) discoverPeers() {
 				continue
 			}
 
-			// 只有非引导节点才主动寻找其他节点
-			if len(n.bootstrapPeers) > 0 {
-				peersChan, err := routingDiscovery.FindPeers(n.ctx, "layer2-network")
-				if err != nil {
-					fmt.Printf("Failed to find peers: %s\n", err)
+			// 打印当前连接的节点数量
+			connectedPeers := n.host.Network().Peers()
+			fmt.Printf("Current connected peers: %d\n", len(connectedPeers))
+
+			// 继续寻找新节点
+			peersChan, err := routingDiscovery.FindPeers(n.ctx, "layer2-network")
+			if err != nil {
+				fmt.Printf("Failed to find peers: %s\n", err)
+				continue
+			}
+
+			for peer := range peersChan {
+				if peer.ID == n.host.ID() {
 					continue
 				}
-
-				for peer := range peersChan {
-					if peer.ID == n.host.ID() {
-						continue
-					}
-					if n.host.Network().Connectedness(peer.ID) != network.Connected {
-						if err := n.host.Connect(n.ctx, peer); err == nil {
-							fmt.Printf("Connected to peer: %s\n", peer.ID)
-						}
+				if n.host.Network().Connectedness(peer.ID) != network.Connected {
+					if err := n.host.Connect(n.ctx, peer); err == nil {
+						fmt.Printf("Connected to discovered peer: %s\n", peer.ID)
 					}
 				}
 			}
+
 		}
 	}
 }

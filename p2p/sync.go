@@ -3,6 +3,9 @@ package p2p
 import (
 	. "FPoS/types"
 	"encoding/json"
+	"fmt"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 func (n *Layer2Node) setupTopics() error {
@@ -86,6 +89,19 @@ func (n *Layer2Node) handleStateMessages() {
 			continue
 		}
 
+		// 尝试解析为节点信息
+		var peerInfo peer.AddrInfo
+		if err := json.Unmarshal(msg.Data, &peerInfo); err == nil {
+			// 收到新节点信息，尝试连接
+			if peerInfo.ID != n.host.ID() && n.host.Network().Connectedness(peerInfo.ID) != network.Connected {
+				if err := n.host.Connect(n.ctx, peerInfo); err == nil {
+					fmt.Printf("Connected to broadcasted peer: %s\n", peerInfo.ID)
+				}
+			}
+			continue
+		}
+
+		// 如果不是节点信息，则尝试解析为状态更新
 		var state struct {
 			StateRoot string `json:"stateRoot"`
 			Height    uint64 `json:"height"`
