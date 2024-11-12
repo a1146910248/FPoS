@@ -5,6 +5,13 @@ import (
 	"time"
 )
 
+// 常量Gas，纯转账交易固定为21000Gas
+const (
+	TransferGas uint64 = 210      // 转账交易固定消耗的gas数量,以太坊为21000
+	GasLimit    uint64 = 10000000 // 默认上限值
+	GasPrice    uint64 = 20       // 默认gas价格
+)
+
 // 交易结构
 type Transaction struct {
 	Hash      string    `json:"hash"`
@@ -12,6 +19,9 @@ type Transaction struct {
 	To        string    `json:"to"`
 	Value     uint64    `json:"value"`
 	Nonce     uint64    `json:"nonce"`
+	GasPrice  uint64    `json:"gasPrice"` // 用户愿意支付的每单位gas的价格
+	GasLimit  uint64    `json:"gasLimit"` // 用户愿意支付的最大gas数量
+	GasUsed   uint64    `json:"gasUsed"`  // 实际使用的gas数量
 	Timestamp time.Time `json:"timestamp"`
 	Signature []byte    `json:"signature"`
 }
@@ -25,6 +35,8 @@ type Block struct {
 	Transactions []Transaction `json:"transactions"`
 	StateRoot    string        `json:"stateRoot"`
 	Proposer     string        `json:"proposer"`
+	GasUsed      uint64        `json:"gasUsed"`  // 区块中所有交易消耗的总gas
+	GasLimit     uint64        `json:"gasLimit"` // 区块gas上限
 	Signature    []byte        `json:"signature"`
 }
 

@@ -2,6 +2,7 @@ package p2p
 
 import (
 	. "FPoS/types"
+	"fmt"
 )
 
 func (n *Layer2Node) SetTransactionHandler(handler TransactionHandler) {
@@ -22,7 +23,7 @@ func (n *Layer2Node) validateTransaction(tx Transaction) bool {
 	n.mu.RUnlock()
 
 	if handler == nil {
-		return n.defaultTxValidation(tx)
+		return n.defaultTxValidation(&tx)
 	}
 	return handler(tx)
 }
@@ -38,7 +39,7 @@ func (n *Layer2Node) validateBlock(block Block) bool {
 	return handler(block)
 }
 
-func (n *Layer2Node) defaultTxValidation(tx Transaction) bool {
+func (n *Layer2Node) defaultTxValidation(tx *Transaction) bool {
 	if _, exists := n.txPool.Load(tx.Hash); exists {
 		return false
 	}
@@ -54,7 +55,11 @@ func (n *Layer2Node) defaultTxValidation(tx Transaction) bool {
 	if len(tx.Signature) == 0 {
 		return false
 	}
-
+	// Gas和余额检查
+	if err := n.stateDB.ValidateTransaction(tx, n.minGasPrice); err != nil {
+		fmt.Println("交易验证不通过：", err)
+		return false
+	}
 	return true
 }
 
