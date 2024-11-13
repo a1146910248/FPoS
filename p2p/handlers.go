@@ -60,6 +60,10 @@ func (n *Layer2Node) defaultTxValidation(tx *Transaction) bool {
 		fmt.Println("交易验证不通过：", err)
 		return false
 	}
+	if err := n.verifyTransactionSignature(tx); err != nil {
+		fmt.Printf("Transaction signature verification failed: %v\n", err)
+		return false
+	}
 	return true
 }
 

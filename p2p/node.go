@@ -256,8 +256,10 @@ func (n *Layer2Node) Start() error {
 	// 寻找网络中的其他节点
 	go n.discoverPeers()
 	// 同步其他的节点世界状态
-	if err := n.syncStateFromPeers(); err != nil {
-		fmt.Printf("Failed to sync state from peers: %s\n", err)
+	if len(n.bootstrapPeers) > 0 {
+		if err := n.syncStateFromPeers(); err != nil {
+			fmt.Printf("Failed to sync state from peers: %s\n", err)
+		}
 	}
 	return nil
 }
