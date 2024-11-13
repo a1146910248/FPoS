@@ -2,7 +2,6 @@ package p2p
 
 import (
 	"FPoS/types"
-	crand "crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -30,7 +29,7 @@ func (n *Layer2Node) StartPeriodicTransaction() {
 				return
 			case <-ticker.C:
 				// 获取一个随机的目标地址
-				toAddress, err := getRandomToPubKey()
+				toAddress, err := n.getRandomToPubKey()
 				if err != nil {
 					fmt.Printf("生成目标地址失败: %v\n", err)
 					continue
@@ -108,6 +107,80 @@ func (n *Layer2Node) signTransaction(tx *types.Transaction) error {
 	return nil
 }
 
+// 修改：验证交易签名的方法
+func (n *Layer2Node) verifyTransactionSignature(tx *types.Transaction) error {
+	// 重建签名消息
+	message, err := json.Marshal(struct {
+		From      string
+		To        string
+		Value     uint64
+		Nonce     uint64
+		GasLimit  uint64
+		GasUsed   uint64
+		GasPrice  uint64
+		Timestamp time.Time
+	}{
+		From:      tx.From,
+		To:        tx.To,
+		Value:     tx.Value,
+		GasLimit:  tx.GasLimit,
+		GasUsed:   tx.GasUsed,
+		GasPrice:  tx.GasPrice,
+		Nonce:     tx.Nonce,
+		Timestamp: tx.Timestamp,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal transaction for verification: %w", err)
+	}
+
+	// 从From地址反推公钥
+	fromAddr := tx.From
+	if len(fromAddr) < 2 || fromAddr[:2] != "0x" {
+		return fmt.Errorf("invalid address format")
+	}
+
+	// 遍历所有连接的节点，查找匹配的地址
+	found := false
+	var pubKey crypto.PubKey
+	// 发送交易的地址可能是自己的，也可能是对等节点的其他人的
+	if addr, err := PublicKeyToAddress(n.publicKey); addr == fromAddr {
+		if err != nil {
+			return fmt.Errorf("invalid address format")
+		}
+		pubKey = n.publicKey
+		found = true
+	} else {
+		for _, peerID := range n.host.Network().Peers() {
+			if pk := n.host.Peerstore().PubKey(peerID); pk != nil {
+				addr, err := PublicKeyToAddress(pk)
+				if err != nil {
+					continue
+				}
+				if addr == fromAddr {
+					pubKey = pk
+					found = true
+					break
+				}
+			}
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("could not find public key for address: %s", fromAddr)
+	}
+
+	// 验证签名
+	valid, err := pubKey.Verify(message, tx.Signature)
+	if err != nil {
+		return fmt.Errorf("signature verification error: %w", err)
+	}
+	if !valid {
+		return fmt.Errorf("invalid transaction signature")
+	}
+
+	return nil
+}
+
 // 计算交易哈希的函数
 func calculateTxHash(tx *types.Transaction) (string, error) {
 	// 创建一个不包含哈希的交易结构用于序列化
@@ -164,24 +237,21 @@ func PublicKeyToAddress(pub crypto.PubKey) (string, error) {
 	return "0x" + hex.EncodeToString(address), nil
 }
 
-// TODO 不能生成随意的pubkey， 而是应该从世界状态池中选择一个链接的节点进行发送
-func getRandomToPubKey() (string, error) {
-	// 生成一个随机的目标节点公钥
-	targetPrivKey, _, err := crypto.GenerateKeyPairWithReader(
-		crypto.Ed25519,
-		2048,
-		crand.Reader,
-	)
-	if err != nil {
-		fmt.Printf("生成目标公钥失败: %v\n", err)
-		return "", err
+func (n *Layer2Node) getRandomToPubKey() (string, error) {
+	n.stateDB.mu.RLock()
+	defer n.stateDB.mu.RUnlock()
+
+	// 获取所有账户地址
+	addresses := make([]string, 0)
+	for addr := range n.stateDB.accounts {
+		// 排除自己的地址
+		if pb, _ := PublicKeyToAddress(n.publicKey); addr != pb {
+			addresses = append(addresses, addr)
+		}
+	}
+	if len(addresses) == 0 {
+		return "", fmt.Errorf("no other addresses available in  state")
 	}
 
-	// 从目标公钥生成地址
-	toAddress, err := PublicKeyToAddress(targetPrivKey.GetPublic())
-	if err != nil {
-		fmt.Printf("生成接收方地址失败: %v\n", err)
-		return "", err
-	}
-	return toAddress, nil
+	return addresses[rand.Intn(len(addresses))], nil
 }
