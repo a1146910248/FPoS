@@ -263,7 +263,6 @@ func (n *Layer2Node) updateLocalState(accounts map[string]*AccountState, pending
 			gasFeeCost := tx.GasUsed * tx.GasPrice
 			totalCost := gasFeeCost + tx.Value
 			pending.pendingBalance -= totalCost
-			pending.pendingNonce++
 			pending.mu.Unlock()
 			n.stateDB.mu.Unlock()
 		} else {
