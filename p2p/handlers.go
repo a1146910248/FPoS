@@ -40,6 +40,11 @@ func (n *Layer2Node) validateBlock(block Block) bool {
 }
 
 func (n *Layer2Node) defaultTxValidation(tx *Transaction) bool {
+	if isRight, err := CalculateTxHash(tx); !isRight || err != nil {
+		fmt.Println("交易哈希错误")
+		return false
+	}
+
 	if _, exists := n.txPool.Load(tx.Hash); exists {
 		return false
 	}
@@ -55,12 +60,20 @@ func (n *Layer2Node) defaultTxValidation(tx *Transaction) bool {
 	if len(tx.Signature) == 0 {
 		return false
 	}
+
+	//// 检查nonce值
+	//currentNonce := n.stateDB.GetNonce(tx.From)
+	//if tx.Nonce != currentNonce+1 {
+	//	fmt.Printf("交易nonce无效: 期望 %d, 实际 %d\n", currentNonce+1, tx.Nonce)
+	//	return false
+	//}
+
 	// Gas和余额检查
 	if err := n.stateDB.ValidateTransaction(tx, n.minGasPrice); err != nil {
 		fmt.Println("交易验证不通过：", err)
 		return false
 	}
-	if err := n.verifyTransactionSignature(tx); err != nil {
+	if err := VerifyTransactionSignature(tx, n); err != nil {
 		fmt.Printf("Transaction signature verification failed: %v\n", err)
 		return false
 	}
@@ -72,6 +85,10 @@ func (n *Layer2Node) defaultBlockValidation(block Block) bool {
 	currentHeight := n.latestBlock
 	n.mu.RUnlock()
 
+	// 检查block hash
+	if hash, err := CalculateBlockHash(&block); hash != block.Hash || err != nil {
+		return false
+	}
 	if block.Height <= currentHeight {
 		return false
 	}
@@ -98,12 +115,19 @@ func (n *Layer2Node) defaultBlockValidation(block Block) bool {
 	if block.Proposer == "" || len(block.Signature) == 0 {
 		return false
 	}
-
+	err := VerifyBlockSignature(&block, n)
+	if err != nil {
+		return false
+	}
 	return true
 }
 
 // 验证区块中的每条交易，需要在交易池中存在，与同步交易刚好相反
 func (n *Layer2Node) validateTxForBlock(tx *Transaction) bool {
+	if isRight, err := CalculateTxHash(tx); !isRight || err != nil {
+		fmt.Println("交易哈希错误")
+		return false
+	}
 	if n.isSequencer {
 		if _, exists := n.txPool.Load(tx.Hash); exists {
 			return false
@@ -125,12 +149,20 @@ func (n *Layer2Node) validateTxForBlock(tx *Transaction) bool {
 	if len(tx.Signature) == 0 {
 		return false
 	}
+
+	//// 检查nonce值
+	//currentNonce := n.stateDB.GetNonce(tx.From)
+	//if tx.Nonce != currentNonce+1 {
+	//	fmt.Printf("交易nonce无效: 期望 %d, 实际 %d\n", currentNonce+1, tx.Nonce)
+	//	return false
+	//}
+
 	// Gas和余额检查
 	if err := n.stateDB.ValidateTransaction(tx, n.minGasPrice); err != nil {
 		fmt.Println("交易验证不通过：", err)
 		return false
 	}
-	if err := n.verifyTransactionSignature(tx); err != nil {
+	if err := VerifyTransactionSignature(tx, n); err != nil {
 		fmt.Printf("Transaction signature verification failed: %v\n", err)
 		return false
 	}
