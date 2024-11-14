@@ -61,12 +61,12 @@ func (n *Layer2Node) defaultTxValidation(tx *Transaction) bool {
 		return false
 	}
 
-	//// 检查nonce值
-	//currentNonce := n.stateDB.GetNonce(tx.From)
-	//if tx.Nonce != currentNonce+1 {
-	//	fmt.Printf("交易nonce无效: 期望 %d, 实际 %d\n", currentNonce+1, tx.Nonce)
-	//	return false
-	//}
+	// 检查nonce值
+	currentNonce := n.stateDB.GetNonce(tx.From)
+	if tx.Nonce != currentNonce+1 {
+		fmt.Printf("交易nonce无效: 期望 %d, 实际 %d\n", currentNonce+1, tx.Nonce)
+		return false
+	}
 
 	// Gas和余额检查
 	if err := n.stateDB.ValidateTransaction(tx, n.minGasPrice); err != nil {
@@ -150,12 +150,12 @@ func (n *Layer2Node) validateTxForBlock(tx *Transaction) bool {
 		return false
 	}
 
-	//// 检查nonce值
-	//currentNonce := n.stateDB.GetNonce(tx.From)
-	//if tx.Nonce != currentNonce+1 {
-	//	fmt.Printf("交易nonce无效: 期望 %d, 实际 %d\n", currentNonce+1, tx.Nonce)
-	//	return false
-	//}
+	// 检查nonce值
+	currentNonce := n.stateDB.GetNonce(tx.From)
+	if tx.Nonce != currentNonce+1 {
+		fmt.Printf("交易nonce无效: 期望 %d, 实际 %d\n", currentNonce+1, tx.Nonce)
+		return false
+	}
 
 	// Gas和余额检查
 	if err := n.stateDB.ValidateTransaction(tx, n.minGasPrice); err != nil {
