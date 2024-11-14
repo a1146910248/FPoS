@@ -17,9 +17,9 @@ func (n *Layer2Node) processNewBlock(block Block) error {
 			block.Height, n.latestBlock)
 	}
 
-	// 验证区块
-	if !n.validateBlock(block) {
-		return fmt.Errorf("block validation failed")
+	// 应用交易前，清理这些交易相关的待处理状态
+	for _, tx := range block.Transactions {
+		n.stateDB.CleanPendingState(tx.From)
 	}
 
 	// 应用交易
@@ -90,10 +90,10 @@ func (n *Layer2Node) RequestSync(fromHeight uint64) error {
 
 func (n *Layer2Node) applyTransactions(txs []Transaction) error {
 	for _, tx := range txs {
-		// 这里实现交易应用逻辑
-		// TODO
-		tx.Hash = "213123"
-		// 例如：更新账户余额、执行智能合约等
+		// 执行交易，更新账户状态
+		if err := n.stateDB.ExecuteTransaction(&tx); err != nil {
+			return fmt.Errorf("failed to execute transaction: %w", err)
+		}
 	}
 	return nil
 }

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"sort"
+	"sync"
 	"time"
 )
 
@@ -46,13 +48,14 @@ func (n *Layer2Node) handleTxMessages() {
 		if err != nil {
 			continue
 		}
-
+		myAddr, _ := PublicKeyToAddress(n.publicKey)
 		var tx Transaction
 		if err := json.Unmarshal(msg.Data, &tx); err == nil {
 			if n.validateTransaction(tx) {
 				n.txPool.Store(tx.Hash, tx)
-				fmt.Printf("已收到一条消息！\ntxHash：%s\ntxFrom:%s\ntxTo:%s\ntxNonce:%d\ntxSig:%x\n\n", tx.Hash, tx.From, tx.To, tx.Nonce, tx.Signature)
-				n.stateDB.ExecuteTransaction(&tx)
+				fmt.Printf("已收到一条消息！\ntxHash：%s\ntxFrom:%s\ntxTo:%s\ntxNonce:%d\ntxSig:%x\n余额:%d\n", tx.Hash, tx.From, tx.To, tx.Nonce, tx.Signature, n.stateDB.GetBalance(myAddr))
+				// 打包成区块再执行
+				//n.stateDB.ExecuteTransaction(&tx)
 				n.BroadcastTransaction(tx)
 			}
 		}
@@ -72,9 +75,10 @@ func (n *Layer2Node) handleBlockMessages() {
 		}
 
 		var block Block
-		if err := json.Unmarshal(msg.Data, &block); err == nil {
+		if err = json.Unmarshal(msg.Data, &block); err == nil {
 			if n.validateBlock(block) {
 				n.processNewBlock(block)
+				fmt.Printf("接收到新区块！\nblockHash：%s\nPrevBlockHash:%s\nBlockHeight:%d\nSig:%x\nProposor:%s\n\n", block.Hash, block.PreviousHash, block.Height, block.Signature, block.Proposer)
 			}
 		}
 	}
@@ -192,7 +196,7 @@ func (n *Layer2Node) syncStateFromPeers() error {
 	select {
 	case resp := <-responseChan:
 		// 更新本地状态
-		n.updateLocalState(resp.Accounts)
+		n.updateLocalState(resp.Accounts, resp.PendingState, resp.PendingTxs)
 		fmt.Printf("----------------------------------------Successfully synced state from peers----------------------------------------\n\n")
 		return nil
 	case <-timeout:
@@ -200,24 +204,125 @@ func (n *Layer2Node) syncStateFromPeers() error {
 	}
 }
 
-// 更新本地状态
-func (n *Layer2Node) updateLocalState(accounts map[string]*AccountState) {
-	n.stateDB.mu.Lock()
-	defer n.stateDB.mu.Unlock()
+func (n *Layer2Node) updateLocalState(accounts map[string]*AccountState,
+	pendingStates map[string]*PendingState, pendingTxs []Transaction) {
 
-	// 合并状态，保留较大的nonce值
+	n.stateDB.mu.Lock()
+
+	// 更新账户状态
 	for addr, newState := range accounts {
 		if existingState, exists := n.stateDB.accounts[addr]; exists {
 			if newState.Nonce > existingState.Nonce {
 				existingState.Nonce = newState.Nonce
 			}
-			if newState.Balance > existingState.Balance {
-				existingState.Balance = newState.Balance
-			}
+			existingState.Balance = newState.Balance
 		} else {
 			n.stateDB.accounts[addr] = &AccountState{
 				Balance: newState.Balance,
 				Nonce:   newState.Nonce,
+			}
+		}
+	}
+	n.stateDB.mu.Unlock()
+
+	// 清空现有的交易池和待处理状态
+	n.txPool = &sync.Map{}
+	n.stateDB.pendingTxs = make(map[string]*PendingState)
+
+	// 按发送方地址和nonce排序交易
+	sort.Slice(pendingTxs, func(i, j int) bool {
+		if pendingTxs[i].From == pendingTxs[j].From {
+			return pendingTxs[i].Nonce < pendingTxs[j].Nonce
+		}
+		return pendingTxs[i].From < pendingTxs[j].From
+	})
+
+	// 重新验证并添加交易，同时更新待处理状态
+	for _, tx := range pendingTxs {
+		if err := n.stateDB.ValidateTransaction(&tx, n.minGasPrice); err == nil {
+			n.stateDB.mu.Lock()
+			// 交易有效，添加到交易池
+			n.txPool.Store(tx.Hash, tx)
+
+			// 更新或创建待处理状态
+			pending, exists := n.stateDB.pendingTxs[tx.From]
+			if !exists {
+				account := n.stateDB.GetAccount(tx.From)
+				pending = &PendingState{
+					pendingBalance: account.Balance,
+					pendingNonce:   account.Nonce,
+					mu:             sync.RWMutex{},
+				}
+				n.stateDB.pendingTxs[tx.From] = pending
+			}
+
+			pending.mu.Lock()
+			gasFeeCost := tx.GasUsed * tx.GasPrice
+			totalCost := gasFeeCost + tx.Value
+			pending.pendingBalance -= totalCost
+			pending.pendingNonce++
+			pending.mu.Unlock()
+			n.stateDB.mu.Unlock()
+		} else {
+			fmt.Printf("Invalid transaction during sync: %s, error: %v\n", tx.Hash, err)
+		}
+	}
+
+	// 验证一致性
+	var txCount int
+	n.txPool.Range(func(_, _ interface{}) bool {
+		txCount++
+		return true
+	})
+
+	pendingCount := 0
+	for addr, pending := range n.stateDB.pendingTxs {
+		pending.mu.RLock()
+		pendingDiff := pending.pendingNonce - n.stateDB.GetAccount(addr).Nonce
+		pending.mu.RUnlock()
+		pendingCount += int(pendingDiff)
+	}
+
+	if txCount != pendingCount {
+		fmt.Printf("Warning: Inconsistency detected - TxPool count: %d, Pending count: %d\n",
+			txCount, pendingCount)
+		// 打印详细信息以调试
+		fmt.Printf("Pending states by address:\n")
+		for addr, pending := range n.stateDB.pendingTxs {
+			pending.mu.RLock()
+			fmt.Printf("Address: %s, Current Nonce: %d, Pending Nonce: %d, Diff: %d\n",
+				addr,
+				n.stateDB.GetAccount(addr).Nonce,
+				pending.pendingNonce,
+				pending.pendingNonce-n.stateDB.GetAccount(addr).Nonce)
+			pending.mu.RUnlock()
+		}
+
+		fmt.Printf("State updated: accounts=%d, pendingStates=%d, pendingTxs=%d\n",
+			len(accounts), len(n.stateDB.pendingTxs), txCount)
+	}
+}
+
+// 重新验证交易池中的所有交易
+func (n *Layer2Node) revalidateTransactionPool() {
+	invalidTxs := make([]string, 0)
+
+	// 收集所有需要移除的交易
+	n.txPool.Range(func(key, value interface{}) bool {
+		if tx, ok := value.(Transaction); ok {
+			// 使用新的状态验证交易
+			if err := n.stateDB.ValidateTransaction(&tx, n.minGasPrice); err != nil {
+				invalidTxs = append(invalidTxs, tx.Hash)
+			}
+		}
+		return true
+	})
+
+	// 移除无效交易
+	for _, hash := range invalidTxs {
+		if txInterface, exists := n.txPool.Load(hash); exists {
+			if tx, ok := txInterface.(Transaction); ok {
+				n.removeFromTxPool(&tx)
 			}
 		}
 	}
@@ -242,11 +347,32 @@ func (n *Layer2Node) handleStateSync(msg *pubsub.Message) {
 				Nonce:   state.Nonce,
 			}
 		}
+		// 收集交易池中的交易
+		var pendingTxs []Transaction
+		n.txPool.Range(func(_, value interface{}) bool {
+			if tx, ok := value.(Transaction); ok {
+				pendingTxs = append(pendingTxs, tx)
+			}
+			return true
+		})
 		n.stateDB.mu.RUnlock()
 
+		// 添加待处理状态信息
+		pendingStates := make(map[string]*PendingState)
+		for addr, pending := range n.stateDB.pendingTxs {
+			pending.mu.RLock()
+			pendingStates[addr] = &PendingState{
+				pendingBalance: pending.pendingBalance,
+				pendingNonce:   pending.pendingNonce,
+			}
+			pending.mu.RUnlock()
+		}
+
 		response := &StateSync{
-			RequestID: syncReq.RequestID,
-			Accounts:  accounts,
+			RequestID:    syncReq.RequestID,
+			Accounts:     accounts,
+			PendingState: pendingStates, // 添加待处理状态
+			PendingTxs:   pendingTxs,
 		}
 
 		// 序列化并发送响应

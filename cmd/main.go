@@ -13,7 +13,8 @@ import (
 func main() {
 	ctx := context.Background()
 	isBootstrap := os.Getenv("BOOTSTRAP") == "true"
-	enableTx := os.Getenv("ENABLE_TX") == "true" // 新增：控制是否启用定时交易
+	enableTx := os.Getenv("ENABLE_TX") == "true"    // 控制是否启用定时交易
+	isSequencer := os.Getenv("SEQUENCER") == "true" // 是否为排序器节点
 
 	var privKeyBytes []byte
 	// 首先尝试从环境变量获取私钥
@@ -56,6 +57,13 @@ func main() {
 			// 启动定时交易
 			node.StartPeriodicTransaction()
 			fmt.Println("已启动定时交易发送")
+		}
+		// TODO 如果是排序器节点，之后会加入共识
+		if isSequencer {
+			// 启动排序器节点
+			sequencer := p2p.NewSequencer(node)
+			sequencer.Start()
+			fmt.Println("Sequencer node started")
 		}
 		if err := node.Start(); err != nil {
 			panic(err)

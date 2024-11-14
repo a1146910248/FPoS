@@ -90,7 +90,7 @@ func (n *Layer2Node) defaultBlockValidation(block Block) bool {
 	}
 
 	for _, tx := range block.Transactions {
-		if !n.validateTransaction(tx) {
+		if !n.validateTxForBlock(&tx) {
 			return false
 		}
 	}
@@ -99,5 +99,40 @@ func (n *Layer2Node) defaultBlockValidation(block Block) bool {
 		return false
 	}
 
+	return true
+}
+
+// 验证区块中的每条交易，需要在交易池中存在，与同步交易刚好相反
+func (n *Layer2Node) validateTxForBlock(tx *Transaction) bool {
+	if n.isSequencer {
+		if _, exists := n.txPool.Load(tx.Hash); exists {
+			return false
+		}
+	} else {
+		if _, exists := n.txPool.Load(tx.Hash); !exists {
+			return false
+		}
+	}
+
+	if tx.Timestamp.IsZero() {
+		return false
+	}
+
+	if tx.From == "" || tx.To == "" {
+		return false
+	}
+
+	if len(tx.Signature) == 0 {
+		return false
+	}
+	// Gas和余额检查
+	if err := n.stateDB.ValidateTransaction(tx, n.minGasPrice); err != nil {
+		fmt.Println("交易验证不通过：", err)
+		return false
+	}
+	if err := n.verifyTransactionSignature(tx); err != nil {
+		fmt.Printf("Transaction signature verification failed: %v\n", err)
+		return false
+	}
 	return true
 }

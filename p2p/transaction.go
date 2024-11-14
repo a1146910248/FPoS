@@ -152,7 +152,7 @@ func (n *Layer2Node) verifyTransactionSignature(tx *types.Transaction) error {
 	} else {
 		for _, peerID := range n.host.Network().Peers() {
 			if pk := n.host.Peerstore().PubKey(peerID); pk != nil {
-				addr, err := PublicKeyToAddress(pk)
+				addr, err = PublicKeyToAddress(pk)
 				if err != nil {
 					continue
 				}
@@ -254,4 +254,10 @@ func (n *Layer2Node) getRandomToPubKey() (string, error) {
 	}
 
 	return addresses[rand.Intn(len(addresses))], nil
+}
+
+// 当交易从交易池移除时（超时或其他原因）
+func (n *Layer2Node) removeFromTxPool(tx *types.Transaction) {
+	n.txPool.Delete(tx.Hash)
+	n.stateDB.RestorePendingState(tx)
 }

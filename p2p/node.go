@@ -43,6 +43,7 @@ type Layer2Node struct {
 	privateKey     crypto.PrivKey
 	publicKey      crypto.PubKey
 	minGasPrice    uint64
+	isSequencer    bool
 	stateDB        *StateDB
 }
 
@@ -105,6 +106,7 @@ func NewLayer2Node(ctx context.Context, port int, bootstrapPeers []string, privK
 		privateKey:     privateKey,
 		publicKey:      privateKey.GetPublic(),
 		minGasPrice:    0,
+		isSequencer:    false,
 		stateDB:        NewStateDB(),
 	}
 	// 设置连接回调
