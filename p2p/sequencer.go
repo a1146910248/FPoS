@@ -2,9 +2,6 @@ package p2p
 
 import (
 	"FPoS/types"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -112,13 +109,13 @@ func (s *Sequencer) produceBlock() {
 	}
 
 	// 签名区块
-	if err := s.signBlock(&block); err != nil {
+	if err := SignBlock(&block, s.node); err != nil {
 		fmt.Printf("Failed to sign block: %v\n", err)
 		return
 	}
 
 	// 计算区块哈希
-	blockHash, err := calculateBlockHash(&block)
+	blockHash, err := CalculateBlockHash(&block)
 	if err != nil {
 		fmt.Printf("Failed to calculate block hash: %v\n", err)
 		return
@@ -135,77 +132,4 @@ func (s *Sequencer) produceBlock() {
 	s.blockHeight++
 	fmt.Printf("New block produced: height=%d, txs=%d, gasUsed=%d\n",
 		block.Height, len(block.Transactions), totalGas)
-}
-
-func (s *Sequencer) signBlock(block *types.Block) error {
-	// 序列化区块数据
-	blockData := struct {
-		Height       uint64
-		Timestamp    time.Time
-		Transactions []types.Transaction
-		PreviousHash string
-		StateRoot    string
-		Proposer     string
-		GasUsed      uint64
-		GasLimit     uint64
-	}{
-		Height:       block.Height,
-		Timestamp:    block.Timestamp,
-		Transactions: block.Transactions,
-		PreviousHash: block.PreviousHash,
-		StateRoot:    block.StateRoot,
-		Proposer:     block.Proposer,
-		GasUsed:      block.GasUsed,
-		GasLimit:     block.GasLimit,
-	}
-
-	data, err := json.Marshal(blockData)
-	if err != nil {
-		return fmt.Errorf("failed to marshal block: %w", err)
-	}
-
-	// 使用节点私钥签名
-	signature, err := s.node.privateKey.Sign(data)
-	if err != nil {
-		return fmt.Errorf("failed to sign block: %w", err)
-	}
-
-	block.Signature = signature
-	return nil
-}
-
-// 计算区块哈希
-func calculateBlockHash(block *types.Block) (string, error) {
-	// 创建用于哈希计算的区块数据结构
-	blockData := struct {
-		Height       uint64
-		PreviousHash string
-		Timestamp    time.Time
-		Transactions []types.Transaction
-		StateRoot    string
-		Proposer     string
-		GasUsed      uint64
-		GasLimit     uint64
-		Signature    []byte
-	}{
-		Height:       block.Height,
-		PreviousHash: block.PreviousHash,
-		Timestamp:    block.Timestamp,
-		Transactions: block.Transactions,
-		StateRoot:    block.StateRoot,
-		Proposer:     block.Proposer,
-		GasUsed:      block.GasUsed,
-		GasLimit:     block.GasLimit,
-		Signature:    block.Signature,
-	}
-
-	// 序列化区块数据
-	data, err := json.Marshal(blockData)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal block: %w", err)
-	}
-
-	// 计算哈希
-	hash := sha256.Sum256(data)
-	return hex.EncodeToString(hash[:]), nil
 }

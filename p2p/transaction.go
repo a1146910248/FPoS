@@ -55,7 +55,7 @@ func (n *Layer2Node) StartPeriodicTransaction() {
 				tx.Hash = hash
 
 				// 签名交易
-				if err := n.signTransaction(&tx); err != nil {
+				if err := SignTransaction(&tx, n); err != nil {
 					fmt.Printf("签名交易失败: %v\n", err)
 					continue
 				}
@@ -73,7 +73,7 @@ func (n *Layer2Node) StartPeriodicTransaction() {
 }
 
 // 添加签名方法
-func (n *Layer2Node) signTransaction(tx *types.Transaction) error {
+func SignTransaction(tx *types.Transaction, node *Layer2Node) error {
 	// 使用节点的私钥对交易进行签名
 	message, err := json.Marshal(struct {
 		From      string
@@ -98,7 +98,7 @@ func (n *Layer2Node) signTransaction(tx *types.Transaction) error {
 		return err
 	}
 
-	signature, err := n.privateKey.Sign(message)
+	signature, err := node.privateKey.Sign(message)
 	if err != nil {
 		return err
 	}
@@ -107,8 +107,8 @@ func (n *Layer2Node) signTransaction(tx *types.Transaction) error {
 	return nil
 }
 
-// 修改：验证交易签名的方法
-func (n *Layer2Node) verifyTransactionSignature(tx *types.Transaction) error {
+// 验证交易签名的方法
+func VerifyTransactionSignature(tx *types.Transaction, n *Layer2Node) error {
 	// 重建签名消息
 	message, err := json.Marshal(struct {
 		From      string
@@ -216,6 +216,43 @@ func calculateTxHash(tx *types.Transaction) (string, error) {
 
 	// 转换为十六进制字符串，添加"0x"前缀
 	return "0x" + hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+// 验证交易哈希的函数
+func CalculateTxHash(tx *types.Transaction) (bool, error) {
+	// 创建一个不包含哈希的交易结构用于序列化
+	txData := struct {
+		From      string    `json:"from"`
+		To        string    `json:"to"`
+		Value     uint64    `json:"value"`
+		Nonce     uint64    `json:"nonce"`
+		GasPrice  uint64    `json:"gasPrice"` // 用户愿意支付的每单位gas的价格
+		GasLimit  uint64    `json:"gasLimit"` // 用户愿意支付的最大gas数量
+		GasUsed   uint64    `json:"gasUsed"`  // 实际使用的gas数量
+		Timestamp time.Time `json:"timestamp"`
+	}{
+		From:      tx.From,
+		To:        tx.To,
+		Value:     tx.Value,
+		GasLimit:  tx.GasLimit,
+		GasUsed:   tx.GasUsed,
+		GasPrice:  tx.GasPrice,
+		Nonce:     tx.Nonce,
+		Timestamp: tx.Timestamp,
+	}
+
+	// 序列化交易数据
+	data, err := json.Marshal(txData)
+	if err != nil {
+		return false, err
+	}
+
+	// 使用 Keccak-256 哈希算法
+	hash := sha3.NewLegacyKeccak256()
+	hash.Write(data)
+
+	// 转换为十六进制字符串，添加"0x"前缀
+	return "0x"+hex.EncodeToString(hash.Sum(nil)) == tx.Hash, nil
 }
 
 // 从公钥生成地址

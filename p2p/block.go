@@ -2,8 +2,12 @@ package p2p
 
 import (
 	. "FPoS/types"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/libp2p/go-libp2p/core/crypto"
+	"time"
 )
 
 // 处理新区块
@@ -103,4 +107,151 @@ func (n *Layer2Node) updateState(stateRoot string, height uint64) {
 	defer n.mu.Unlock()
 	n.stateRoot = stateRoot
 	n.latestBlock = height
+}
+
+func SignBlock(block *Block, node *Layer2Node) error {
+	// 序列化区块数据
+	blockData := struct {
+		Height       uint64
+		Timestamp    time.Time
+		Transactions []Transaction
+		PreviousHash string
+		StateRoot    string
+		Proposer     string
+		GasUsed      uint64
+		GasLimit     uint64
+	}{
+		Height:       block.Height,
+		Timestamp:    block.Timestamp,
+		Transactions: block.Transactions,
+		PreviousHash: block.PreviousHash,
+		StateRoot:    block.StateRoot,
+		Proposer:     block.Proposer,
+		GasUsed:      block.GasUsed,
+		GasLimit:     block.GasLimit,
+	}
+
+	data, err := json.Marshal(blockData)
+	if err != nil {
+		return fmt.Errorf("failed to marshal block: %w", err)
+	}
+
+	// 使用节点私钥签名
+	signature, err := node.privateKey.Sign(data)
+	if err != nil {
+		return fmt.Errorf("failed to sign block: %w", err)
+	}
+
+	block.Signature = signature
+	return nil
+}
+
+// 验证区块签名的方法
+func VerifyBlockSignature(block *Block, n *Layer2Node) error {
+	// 重建区块数据
+	blockData, err := json.Marshal(struct {
+		Height       uint64
+		Timestamp    time.Time
+		Transactions []Transaction
+		PreviousHash string
+		StateRoot    string
+		Proposer     string
+		GasUsed      uint64
+		GasLimit     uint64
+	}{
+		Height:       block.Height,
+		Timestamp:    block.Timestamp,
+		Transactions: block.Transactions,
+		PreviousHash: block.PreviousHash,
+		StateRoot:    block.StateRoot,
+		Proposer:     block.Proposer,
+		GasUsed:      block.GasUsed,
+		GasLimit:     block.GasLimit,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal block for verification: %w", err)
+	}
+
+	// 从From地址反推公钥
+	proposer := block.Proposer
+	if len(proposer) < 2 || proposer[:2] != "0x" {
+		return fmt.Errorf("invalid address format")
+	}
+
+	// 遍历所有连接的节点，查找匹配的地址
+	found := false
+	var pubKey crypto.PubKey
+	// 发送交易的地址可能是自己的，也可能是对等节点的其他人的
+	if addr, err := PublicKeyToAddress(n.publicKey); addr == proposer {
+		if err != nil {
+			return fmt.Errorf("invalid address format")
+		}
+		pubKey = n.publicKey
+		found = true
+	} else {
+		for _, peerID := range n.host.Network().Peers() {
+			if pk := n.host.Peerstore().PubKey(peerID); pk != nil {
+				addr, err = PublicKeyToAddress(pk)
+				if err != nil {
+					continue
+				}
+				if addr == proposer {
+					pubKey = pk
+					found = true
+					break
+				}
+			}
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("could not find public key for address: %s", proposer)
+	}
+
+	// 验证签名
+	valid, err := pubKey.Verify(blockData, block.Signature)
+	if err != nil {
+		return fmt.Errorf("signature verification error: %w", err)
+	}
+	if !valid {
+		return fmt.Errorf("invalid block signature")
+	}
+
+	return nil
+}
+
+// 计算区块哈希
+func CalculateBlockHash(block *Block) (string, error) {
+	// 创建用于哈希计算的区块数据结构
+	blockData := struct {
+		Height       uint64
+		PreviousHash string
+		Timestamp    time.Time
+		Transactions []Transaction
+		StateRoot    string
+		Proposer     string
+		GasUsed      uint64
+		GasLimit     uint64
+		Signature    []byte
+	}{
+		Height:       block.Height,
+		PreviousHash: block.PreviousHash,
+		Timestamp:    block.Timestamp,
+		Transactions: block.Transactions,
+		StateRoot:    block.StateRoot,
+		Proposer:     block.Proposer,
+		GasUsed:      block.GasUsed,
+		GasLimit:     block.GasLimit,
+		Signature:    block.Signature,
+	}
+
+	// 序列化区块数据
+	data, err := json.Marshal(blockData)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal block: %w", err)
+	}
+
+	// 计算哈希
+	hash := sha256.Sum256(data)
+	return hex.EncodeToString(hash[:]), nil
 }

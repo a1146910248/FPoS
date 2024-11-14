@@ -79,10 +79,20 @@ func (s *StateDB) GetNonce(address string) uint64 {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	if account, exists := s.accounts[address]; exists {
-		return account.Nonce
+	account := s.GetAccount(address)
+	baseNonce := account.Nonce
+
+	// 如果存在待处理状态，返回较大的nonce
+	if pending, exists := s.pendingTxs[address]; exists {
+		pending.mu.RLock()
+		pendingNonce := pending.pendingNonce
+		pending.mu.RUnlock()
+		if pendingNonce > baseNonce {
+			return pendingNonce
+		}
 	}
-	return 0
+
+	return baseNonce
 }
 
 // UpdateBalance 更新余额

@@ -77,7 +77,11 @@ func (n *Layer2Node) handleBlockMessages() {
 		var block Block
 		if err = json.Unmarshal(msg.Data, &block); err == nil {
 			if n.validateBlock(block) {
-				n.processNewBlock(block)
+				err = n.processNewBlock(block)
+				if err != nil {
+					fmt.Printf("process block fail")
+					return
+				}
 				fmt.Printf("接收到新区块！\nblockHash：%s\nPrevBlockHash:%s\nBlockHeight:%d\nSig:%x\nProposor:%s\n\n", block.Hash, block.PreviousHash, block.Height, block.Signature, block.Proposer)
 			}
 		}
@@ -196,7 +200,7 @@ func (n *Layer2Node) syncStateFromPeers() error {
 	select {
 	case resp := <-responseChan:
 		// 更新本地状态
-		n.updateLocalState(resp.Accounts, resp.PendingState, resp.PendingTxs)
+		n.updateLocalState(resp.Accounts, resp.PendingTxs)
 		fmt.Printf("----------------------------------------Successfully synced state from peers----------------------------------------\n\n")
 		return nil
 	case <-timeout:
@@ -204,8 +208,7 @@ func (n *Layer2Node) syncStateFromPeers() error {
 	}
 }
 
-func (n *Layer2Node) updateLocalState(accounts map[string]*AccountState,
-	pendingStates map[string]*PendingState, pendingTxs []Transaction) {
+func (n *Layer2Node) updateLocalState(accounts map[string]*AccountState, pendingTxs []Transaction) {
 
 	n.stateDB.mu.Lock()
 
