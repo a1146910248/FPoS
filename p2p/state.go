@@ -17,20 +17,33 @@ type AccountState struct {
 
 // StateDB 状态数据库
 type StateDB struct {
-	accounts map[string]*AccountState // 地址 -> 账户状态
-	mu       sync.RWMutex
+	accounts   map[string]*AccountState // 地址 -> 账户状态
+	pendingTxs map[string]*PendingState
+	mu         sync.RWMutex
 }
 
-// 新增：状态同步请求和响应的消息结构
+// PendingState 待处理交易的结构
+type PendingState struct {
+	pendingBalance uint64
+	pendingNonce   uint64
+	mu             sync.RWMutex
+}
+
+// StateSync 状态同步请求和响应的消息结构
 type StateSync struct {
-	RequestID string                   `json:"requestId"`
-	Accounts  map[string]*AccountState `json:"accounts"`
+	RequestID    string                   `json:"requestId"`
+	FromHeight   uint64                   `json:"fromHeight"`
+	ToHeight     uint64                   `json:"toHeight"`
+	Accounts     map[string]*AccountState `json:"accounts"`
+	PendingState map[string]*PendingState `json:"pendingState,omitempty"`
+	PendingTxs   []types.Transaction      `json:"pendingTxs,omitempty"`
 }
 
 // NewStateDB 创建新的状态数据库
 func NewStateDB() *StateDB {
 	return &StateDB{
-		accounts: make(map[string]*AccountState),
+		accounts:   make(map[string]*AccountState),
+		pendingTxs: make(map[string]*PendingState),
 	}
 }
 
@@ -98,25 +111,66 @@ func (s *StateDB) ValidateTransaction(tx *types.Transaction, minGasPrice uint64)
 		return fmt.Errorf("gas price too low, minimum required: %d", minGasPrice)
 	}
 
+	sender := s.GetAccount(tx.From)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// 获取或创建待处理状态
+	pending, exists := s.pendingTxs[tx.From]
+	if !exists {
+		pending = &PendingState{
+			pendingBalance: sender.Balance,
+			pendingNonce:   sender.Nonce,
+		}
+		s.pendingTxs[tx.From] = pending
+	}
+
+	pending.mu.Lock()
+	defer pending.mu.Unlock()
+
 	// 计算交易需要的总费用
 	gasFeeCost := tx.GasUsed * tx.GasPrice
 	totalCost := gasFeeCost + tx.Value
 
 	// 检查发送方余额
-	sender := s.GetAccount(tx.From)
 	sender.mu.RLock()
 	defer sender.mu.RUnlock()
 
-	if sender.Balance < totalCost {
-		return fmt.Errorf("insufficient balance: has %d, needs %d", sender.Balance, totalCost)
+	// 检查待处理余额是否足够
+	if pending.pendingBalance < totalCost {
+		return fmt.Errorf("insufficient balance (including pending): has %d, needs %d",
+			pending.pendingBalance, totalCost)
 	}
 
-	// 检查nonce
-	if tx.Nonce != sender.Nonce+1 {
-		return fmt.Errorf("invalid nonce: expected %d, got %d", sender.Nonce+1, tx.Nonce)
-	}
+	// 更新待处理状态
+	pending.pendingBalance -= totalCost
+	pending.pendingNonce++
 
 	return nil
+}
+
+// CleanPendingState 当交易被打包进区块时，清理待处理状态
+func (s *StateDB) CleanPendingState(address string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.pendingTxs, address)
+}
+
+// RestorePendingState 当交易从交易池移除时，恢复待处理状态
+func (s *StateDB) RestorePendingState(tx *types.Transaction) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if pending, exists := s.pendingTxs[tx.From]; exists {
+		pending.mu.Lock()
+		defer pending.mu.Unlock()
+
+		gasFeeCost := tx.GasUsed * tx.GasPrice
+		totalCost := gasFeeCost + tx.Value
+
+		pending.pendingBalance += totalCost
+		pending.pendingNonce--
+	}
 }
 
 // ExecuteTransaction 执行交易
