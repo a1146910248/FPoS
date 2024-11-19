@@ -34,6 +34,7 @@ type Block struct {
 	Timestamp    time.Time     `json:"timestamp"`
 	Transactions []Transaction `json:"transactions"`
 	StateRoot    string        `json:"stateRoot"`
+	TxRoot       string        `json:"txRoot"` // 交易默克尔根
 	Proposer     string        `json:"proposer"`
 	GasUsed      uint64        `json:"gasUsed"`  // 区块中所有交易消耗的总gas
 	GasLimit     uint64        `json:"gasLimit"` // 区块gas上限

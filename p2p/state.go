@@ -37,6 +37,7 @@ type StateSync struct {
 	Accounts     map[string]*AccountState `json:"accounts"`
 	PendingState map[string]*PendingState `json:"pendingState,omitempty"`
 	PendingTxs   []types.Transaction      `json:"pendingTxs,omitempty"`
+	Blocks       []types.Block            `json:"blocks,omitempty"`
 }
 
 // NewStateDB 创建新的状态数据库
@@ -80,19 +81,17 @@ func (s *StateDB) GetNonce(address string) uint64 {
 	defer s.mu.RUnlock()
 
 	account := s.GetAccount(address)
-	baseNonce := account.Nonce
+	confirmedNonce := account.Nonce
 
-	// 如果存在待处理状态，返回较大的nonce
+	// 如果存在待处理状态，返回待处理的nonce
 	if pending, exists := s.pendingTxs[address]; exists {
 		pending.mu.RLock()
 		pendingNonce := pending.pendingNonce
 		pending.mu.RUnlock()
-		if pendingNonce > baseNonce {
-			return pendingNonce
-		}
+		return pendingNonce
 	}
 
-	return baseNonce
+	return confirmedNonce
 }
 
 // UpdateBalance 更新余额
@@ -225,4 +224,24 @@ func (s *StateDB) GetStateRoot() string {
 	// 计算哈希
 	hash := sha256.Sum256(data)
 	return fmt.Sprintf("%x", hash)
+}
+
+// 重置待处理状态为已确认的nonce
+func (s *StateDB) ResetPendingNonce(address string) {
+	account := s.GetAccount(address)
+	confirmedNonce := account.Nonce
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if pending, exists := s.pendingTxs[address]; exists {
+		pending.mu.Lock()
+		// 重置为已确认的nonce
+		pending.pendingNonce = confirmedNonce
+		pending.mu.Unlock()
+	} else {
+		// 如果不存在待处理状态，创建一个
+		s.pendingTxs[address] = &PendingState{
+			pendingNonce: confirmedNonce,
+		}
+	}
 }

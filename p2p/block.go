@@ -11,20 +11,23 @@ import (
 )
 
 // 处理新区块
-func (n *Layer2Node) processNewBlock(block Block) error {
+func (n *Layer2Node) processNewBlock(block Block, isHistoricalBlock bool) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
+	fmt.Printf("Processing block %d, current account nonces:\n", block.Height)
+	for addr := range n.stateDB.accounts {
+		fmt.Printf("Account %s nonce: %d\n", addr, n.stateDB.GetNonce(addr))
+	}
+
 	// 检查区块高度
-	if block.Height <= n.latestBlock {
+	if !isHistoricalBlock && block.Height <= n.latestBlock {
 		return fmt.Errorf("block height %d is not higher than current height %d",
 			block.Height, n.latestBlock)
 	}
 
-	// 应用交易前，清理这些交易相关的待处理状态
-	for _, tx := range block.Transactions {
-		n.stateDB.CleanPendingState(tx.From)
-	}
+	// 使用新的方法原子性地处理交易池和待处理状态
+	n.cleanTxPoolAndPendingStates(block.Transactions)
 
 	// 应用交易
 	if err := n.applyTransactions(block.Transactions); err != nil {
@@ -35,11 +38,6 @@ func (n *Layer2Node) processNewBlock(block Block) error {
 	n.latestBlock = block.Height
 	n.stateRoot = block.StateRoot
 	n.blockCache.Store(block.Height, block)
-
-	// 从交易池中移除已处理的交易
-	for _, tx := range block.Transactions {
-		n.txPool.Delete(tx.Hash)
-	}
 
 	return nil
 }
@@ -254,4 +252,81 @@ func CalculateBlockHash(block *Block) (string, error) {
 	// 计算哈希
 	hash := sha256.Sum256(data)
 	return hex.EncodeToString(hash[:]), nil
+}
+func (n *Layer2Node) cleanTxPoolAndPendingStates(txs []Transaction) {
+	n.stateDB.mu.Lock()
+
+	// 创建交易 map 用于快速查找
+	txHashes := make(map[string]struct{})
+	txsByAddress := make(map[string][]Transaction)
+
+	for _, tx := range txs {
+		txHashes[tx.Hash] = struct{}{}
+		txsByAddress[tx.From] = append(txsByAddress[tx.From], tx)
+	}
+
+	// 清理交易池
+	var txsToRemove []interface{}
+	n.txPool.Range(func(key, value interface{}) bool {
+		if hash, ok := key.(string); ok {
+			if _, exists := txHashes[hash]; exists {
+				txsToRemove = append(txsToRemove, key)
+			}
+		}
+		return true
+	})
+
+	// 删除已确认的交易
+	for _, key := range txsToRemove {
+		n.txPool.Delete(key)
+	}
+	n.stateDB.mu.Unlock()
+	// 更新每个地址的待处理状态
+	for address := range txsByAddress {
+		// 重置待处理状态到最新确认的 nonce
+		n.stateDB.ResetPendingNonce(address)
+
+		// 重新应用剩余的待处理交易
+		n.txPool.Range(func(_, value interface{}) bool {
+			if tx, ok := value.(Transaction); ok {
+				if tx.From == address {
+					if pending, exists := n.stateDB.pendingTxs[address]; exists {
+						pending.mu.Lock()
+						pending.pendingNonce++
+						pending.mu.Unlock()
+					}
+				}
+			}
+			return true
+		})
+	}
+}
+
+// 处理新区块
+func (n *Layer2Node) processNewBlockInternal(block Block, isHistoricalBlock bool) error {
+	fmt.Printf("Processing block %d, current account nonces:\n", block.Height)
+	for addr := range n.stateDB.accounts {
+		fmt.Printf("Account %s nonce: %d\n", addr, n.stateDB.GetNonce(addr))
+	}
+
+	// 检查区块高度
+	if !isHistoricalBlock && block.Height <= n.latestBlock {
+		return fmt.Errorf("block height %d is not higher than current height %d",
+			block.Height, n.latestBlock)
+	}
+
+	// 使用新的方法原子性地处理交易池和待处理状态
+	n.cleanTxPoolAndPendingStates(block.Transactions)
+
+	// 应用交易
+	if err := n.applyTransactions(block.Transactions); err != nil {
+		return err
+	}
+
+	// 更新状态
+	n.latestBlock = block.Height
+	n.stateRoot = block.StateRoot
+	n.blockCache.Store(block.Height, block)
+
+	return nil
 }

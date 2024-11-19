@@ -37,26 +37,79 @@ func (n *Layer2Node) setupTopics() error {
 	return nil
 }
 
+type pendingMessage struct {
+	msg       *pubsub.Message
+	timestamp time.Time
+}
+
 func (n *Layer2Node) handleTxMessages() {
 	sub, err := n.txTopic.Subscribe()
 	if err != nil {
 		return
 	}
 
+	pendingMsgs := make(chan *pendingMessage, 1000)
+
+	go func() {
+		for pending := range pendingMsgs {
+			for {
+				n.mu.RLock()
+				isSyncing := n.isSyncing
+				n.mu.RUnlock()
+
+				if !isSyncing {
+					break
+				}
+				time.Sleep(100 * time.Millisecond)
+			}
+
+			if time.Since(pending.timestamp) > 5*time.Minute {
+				fmt.Printf("Pending transaction expired, skipping\n")
+				continue
+			}
+
+			var tx Transaction
+			if err := json.Unmarshal(pending.msg.Data, &tx); err == nil {
+				if n.validateTransaction(tx) {
+					n.txPool.Store(tx.Hash, tx)
+					fmt.Printf("Processed pending transaction: from=%s, nonce=%d\n",
+						tx.From, tx.Nonce)
+					// 移除重复广播
+				}
+			}
+		}
+	}()
+
 	for {
 		msg, err := sub.Next(n.ctx)
 		if err != nil {
 			continue
 		}
-		myAddr, _ := PublicKeyToAddress(n.publicKey)
+
+		n.mu.RLock()
+		isSyncing := n.isSyncing
+		n.mu.RUnlock()
+
+		if isSyncing {
+			select {
+			case pendingMsgs <- &pendingMessage{
+				msg:       msg,
+				timestamp: time.Now(),
+			}:
+				fmt.Printf("Transaction queued for processing after sync\n")
+			default:
+				fmt.Printf("Pending message queue full, dropping transaction\n")
+			}
+			continue
+		}
+
 		var tx Transaction
 		if err := json.Unmarshal(msg.Data, &tx); err == nil {
 			if n.validateTransaction(tx) {
 				n.txPool.Store(tx.Hash, tx)
-				fmt.Printf("已收到一条消息！\ntxHash：%s\ntxFrom:%s\ntxTo:%s\ntxNonce:%d\ntxSig:%x\n余额:%d\n", tx.Hash, tx.From, tx.To, tx.Nonce, tx.Signature, n.stateDB.GetBalance(myAddr))
-				// 打包成区块再执行
-				//n.stateDB.ExecuteTransaction(&tx)
-				n.BroadcastTransaction(tx)
+				fmt.Printf("Received new transaction: from=%s, nonce=%d\n",
+					tx.From, tx.Nonce)
+				n.BroadcastTransaction(tx) // 只在这里广播一次
 			}
 		}
 	}
@@ -76,8 +129,9 @@ func (n *Layer2Node) handleBlockMessages() {
 
 		var block Block
 		if err = json.Unmarshal(msg.Data, &block); err == nil {
-			if n.validateBlock(block) {
-				err = n.processNewBlock(block)
+			if n.validateBlock(block, false) {
+				isHistoricalBlock := block.Height <= n.latestBlock
+				err = n.processNewBlock(block, isHistoricalBlock)
 				if err != nil {
 					fmt.Printf("process block fail")
 					return
@@ -140,7 +194,7 @@ func (n *Layer2Node) handleStateMessages() {
 // 从其他节点同步状态
 func (n *Layer2Node) syncStateFromPeers() error {
 	// 首先等待一段时间，确保有足够的节点连接
-	time.Sleep(2 * time.Second)
+	time.Sleep(1 * time.Second)
 	// 创建状态同步请求
 	syncReq := &StateSync{
 		RequestID: uuid.New().String(),
@@ -200,7 +254,7 @@ func (n *Layer2Node) syncStateFromPeers() error {
 	select {
 	case resp := <-responseChan:
 		// 更新本地状态
-		n.updateLocalState(resp.Accounts, resp.PendingTxs)
+		n.updateLocalState(resp.Accounts, resp.PendingTxs, resp.Blocks, resp.ToHeight)
 		fmt.Printf("----------------------------------------Successfully synced state from peers----------------------------------------\n\n")
 		return nil
 	case <-timeout:
@@ -208,21 +262,26 @@ func (n *Layer2Node) syncStateFromPeers() error {
 	}
 }
 
-func (n *Layer2Node) updateLocalState(accounts map[string]*AccountState, pendingTxs []Transaction) {
+func (n *Layer2Node) updateLocalState(accounts map[string]*AccountState, pendingTxs []Transaction, blocks []Block, newHeight uint64) {
+	n.mu.Lock()
+	n.isSyncing = true
+	n.mu.Unlock()
+	defer func() {
+		n.mu.Lock()
+		n.isSyncing = false
+		n.mu.Unlock()
+	}()
 
 	n.stateDB.mu.Lock()
-
 	// 更新账户状态
 	for addr, newState := range accounts {
 		if existingState, exists := n.stateDB.accounts[addr]; exists {
-			if newState.Nonce > existingState.Nonce {
-				existingState.Nonce = newState.Nonce
-			}
+
 			existingState.Balance = newState.Balance
 		} else {
 			n.stateDB.accounts[addr] = &AccountState{
 				Balance: newState.Balance,
-				Nonce:   newState.Nonce,
+				Nonce:   0,
 			}
 		}
 	}
@@ -230,6 +289,7 @@ func (n *Layer2Node) updateLocalState(accounts map[string]*AccountState, pending
 
 	// 清空现有的交易池和待处理状态
 	n.txPool = &sync.Map{}
+	n.stateDB.mu.Lock()
 	n.stateDB.pendingTxs = make(map[string]*PendingState)
 
 	// 按发送方地址和nonce排序交易
@@ -239,7 +299,7 @@ func (n *Layer2Node) updateLocalState(accounts map[string]*AccountState, pending
 		}
 		return pendingTxs[i].From < pendingTxs[j].From
 	})
-
+	n.stateDB.mu.Unlock()
 	// 重新验证并添加交易，同时更新待处理状态
 	for _, tx := range pendingTxs {
 		if err := n.stateDB.ValidateTransaction(&tx, n.minGasPrice); err == nil {
@@ -259,11 +319,6 @@ func (n *Layer2Node) updateLocalState(accounts map[string]*AccountState, pending
 				n.stateDB.pendingTxs[tx.From] = pending
 			}
 
-			pending.mu.Lock()
-			gasFeeCost := tx.GasUsed * tx.GasPrice
-			totalCost := gasFeeCost + tx.Value
-			pending.pendingBalance -= totalCost
-			pending.mu.Unlock()
 			n.stateDB.mu.Unlock()
 		} else {
 			fmt.Printf("Invalid transaction during sync: %s, error: %v\n", tx.Hash, err)
@@ -303,6 +358,24 @@ func (n *Layer2Node) updateLocalState(accounts map[string]*AccountState, pending
 		fmt.Printf("State updated: accounts=%d, pendingStates=%d, pendingTxs=%d\n",
 			len(accounts), len(n.stateDB.pendingTxs), txCount)
 	}
+	n.mu.Lock()
+	n.latestBlock = newHeight
+	// 签名的交易和账户重构完成后再同步区块，否则会出现nonce等不一致区块
+	for _, block := range blocks {
+		// 验证区块
+		if !n.validateBlockInternal(block, true) {
+			fmt.Printf("Invalid block during sync: height=%d, hash=%s\n",
+				block.Height, block.Hash)
+			continue
+		}
+
+		// 处理区块
+		if err := n.processNewBlockInternal(block, true); err != nil {
+			fmt.Printf("Failed to process block during sync: %v\n", err)
+			continue
+		}
+	}
+	n.mu.Unlock()
 }
 
 // 重新验证交易池中的所有交易
@@ -370,11 +443,24 @@ func (n *Layer2Node) handleStateSync(msg *pubsub.Message) {
 			pending.mu.RUnlock()
 		}
 
+		// 收集区块信息
+		blocks := make([]Block, 0)
+		for height := syncReq.FromHeight; height <= n.latestBlock; height++ {
+			if blockInterface, exists := n.blockCache.Load(height); exists {
+				if block, ok := blockInterface.(Block); ok {
+					blocks = append(blocks, block)
+				}
+			}
+		}
+
 		response := &StateSync{
 			RequestID:    syncReq.RequestID,
 			Accounts:     accounts,
 			PendingState: pendingStates, // 添加待处理状态
 			PendingTxs:   pendingTxs,
+			Blocks:       blocks,
+			FromHeight:   syncReq.FromHeight,
+			ToHeight:     n.latestBlock,
 		}
 
 		// 序列化并发送响应
