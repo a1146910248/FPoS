@@ -210,6 +210,11 @@ func (n *Layer2Node) handleNewPeer(p peer.ID) {
 	// 将新节点添加到状态数据库
 	if _, exists := n.stateDB.accounts[peerAddress]; !exists {
 		// 为新节点设置初始状态
+		err = n.stateDB.SetAccountPublicKey(peerAddress, pubKey)
+		if err != nil {
+			fmt.Printf("Failed to generate acoount for peer %s: %s\n", peerAddress, err)
+			return
+		}
 		n.stateDB.UpdateBalance(peerAddress, 1000000000000) // 0.001 ETH 初始余额
 		fmt.Printf("Added new peer to state: %s with initial balance\n", peerAddress)
 	}

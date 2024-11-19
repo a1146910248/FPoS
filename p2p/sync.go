@@ -276,12 +276,13 @@ func (n *Layer2Node) updateLocalState(accounts map[string]*AccountState, pending
 	// 更新账户状态
 	for addr, newState := range accounts {
 		if existingState, exists := n.stateDB.accounts[addr]; exists {
-
 			existingState.Balance = newState.Balance
 		} else {
 			n.stateDB.accounts[addr] = &AccountState{
-				Balance: newState.Balance,
-				Nonce:   0,
+				Balance:       newState.Balance,
+				Nonce:         0,
+				PublicKey:     newState.PublicKey,
+				PublicKeyType: newState.PublicKeyType,
 			}
 		}
 	}
@@ -418,8 +419,10 @@ func (n *Layer2Node) handleStateSync(msg *pubsub.Message) {
 		accounts := make(map[string]*AccountState)
 		for addr, state := range n.stateDB.accounts {
 			accounts[addr] = &AccountState{
-				Balance: state.Balance,
-				Nonce:   state.Nonce,
+				Balance:       state.Balance,
+				Nonce:         state.Nonce,
+				PublicKey:     state.PublicKey,
+				PublicKeyType: state.PublicKeyType,
 			}
 		}
 		// 收集交易池中的交易
