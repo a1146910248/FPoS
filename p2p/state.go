@@ -5,14 +5,17 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"github.com/libp2p/go-libp2p/core/crypto"
 	"sync"
 )
 
 // AccountState 账户状态
 type AccountState struct {
-	Balance uint64
-	Nonce   uint64
-	mu      sync.RWMutex
+	Balance       uint64
+	Nonce         uint64
+	PublicKey     []byte
+	PublicKeyType string
+	mu            sync.RWMutex
 }
 
 // StateDB 状态数据库
@@ -243,5 +246,60 @@ func (s *StateDB) ResetPendingNonce(address string) {
 		s.pendingTxs[address] = &PendingState{
 			pendingNonce: confirmedNonce,
 		}
+	}
+}
+
+// 添加辅助方法来设置和获取公钥
+func (s *StateDB) SetAccountPublicKey(address string, pubKey crypto.PubKey) error {
+	pubKeyBytes, err := pubKey.Raw()
+	if err != nil {
+		return err
+	}
+
+	// 获取公钥类型
+	keyType := ""
+	switch pubKey.Type() {
+	case crypto.Ed25519:
+		keyType = "Ed25519"
+	case crypto.Secp256k1:
+		keyType = "Secp256k1"
+	default:
+		return fmt.Errorf("unsupported key type: %d", pubKey.Type())
+	}
+
+	account := s.GetAccount(address)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	account.mu.Lock()
+	account.PublicKey = pubKeyBytes
+	account.PublicKeyType = keyType
+	account.mu.Unlock()
+
+	return nil
+}
+
+// 获取公钥的方法
+func (s *StateDB) GetAccountPublicKey(address string) (crypto.PubKey, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	account := s.GetAccount(address)
+	account.mu.RLock()
+	pubKeyBytes := account.PublicKey
+	keyType := account.PublicKeyType
+	account.mu.RUnlock()
+
+	if len(pubKeyBytes) == 0 {
+		return nil, fmt.Errorf("public key not found for address: %s", address)
+	}
+
+	// 根据类型重构公钥
+	switch keyType {
+	case "Ed25519":
+		return crypto.UnmarshalEd25519PublicKey(pubKeyBytes)
+	case "Secp256k1":
+		return crypto.UnmarshalSecp256k1PublicKey(pubKeyBytes)
+	default:
+		return nil, fmt.Errorf("unsupported key type: %s", keyType)
 	}
 }

@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/libp2p/go-libp2p/core/crypto"
 	"time"
 )
 
@@ -176,34 +175,22 @@ func VerifyBlockSignature(block *Block, n *Layer2Node) error {
 		return fmt.Errorf("invalid address format")
 	}
 
-	// 遍历所有连接的节点，查找匹配的地址
-	found := false
-	var pubKey crypto.PubKey
-	// 发送交易的地址可能是自己的，也可能是对等节点的其他人的
-	if addr, err := PublicKeyToAddress(n.publicKey); addr == proposer {
+	// 首先检查是否是本节点的地址
+	if addr, err := PublicKeyToAddress(n.publicKey); err == nil && addr == proposer {
+		valid, err := n.publicKey.Verify(blockData, block.Signature)
 		if err != nil {
-			return fmt.Errorf("invalid address format")
+			return fmt.Errorf("signature verification error: %w", err)
 		}
-		pubKey = n.publicKey
-		found = true
-	} else {
-		for _, peerID := range n.host.Network().Peers() {
-			if pk := n.host.Peerstore().PubKey(peerID); pk != nil {
-				addr, err = PublicKeyToAddress(pk)
-				if err != nil {
-					continue
-				}
-				if addr == proposer {
-					pubKey = pk
-					found = true
-					break
-				}
-			}
+		if !valid {
+			return fmt.Errorf("invalid block signature")
 		}
+		return nil
 	}
 
-	if !found {
-		return fmt.Errorf("could not find public key for address: %s", proposer)
+	// 从账户状态中获取公钥
+	pubKey, err := n.stateDB.GetAccountPublicKey(proposer)
+	if err != nil {
+		return fmt.Errorf("failed to get proposer public key: %w", err)
 	}
 
 	// 验证签名
