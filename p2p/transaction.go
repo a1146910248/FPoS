@@ -12,8 +12,17 @@ import (
 )
 
 func (n *Layer2Node) StartPeriodicTransaction() {
+	// 添加标志防止重复启动
+	n.mu.Lock()
+	if n.periodicTxStarted { // 需要在 Layer2Node 结构体中添加此字段
+		n.mu.Unlock()
+		return
+	}
+	n.periodicTxStarted = true
+	n.mu.Unlock()
+
 	go func() {
-		ticker := time.NewTicker(10 * time.Second)
+		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
 
 		// 获取本节点的地址
@@ -28,6 +37,14 @@ func (n *Layer2Node) StartPeriodicTransaction() {
 			case <-n.ctx.Done():
 				return
 			case <-ticker.C:
+				// 检查是否为 sequencer
+				n.mu.RLock()
+				isSeq := n.isSequencer
+				n.mu.RUnlock()
+				if isSeq {
+					fmt.Printf("Skipping transaction generation for sequencer node\n")
+					continue
+				}
 				// 获取一个随机的目标地址
 				toAddress, err := n.getRandomToPubKey()
 				if err != nil {

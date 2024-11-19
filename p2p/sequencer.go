@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-const _MaxBlockGasLimit_ = 500
+const _MaxBlockGasLimit_ = 800
 
 type Sequencer struct {
 	node             *Layer2Node
@@ -94,6 +94,7 @@ func (s *Sequencer) produceBlock() {
 		Timestamp:    time.Now(),
 		Transactions: transactions,
 		StateRoot:    s.node.stateDB.GetStateRoot(),
+		TxRoot:       types.CalculateMerkleRoot(transactions),
 		Proposer:     proPub,
 		GasUsed:      totalGas, // 记录区块使用的总gas
 		GasLimit:     s.maxBlockGasLimit,
