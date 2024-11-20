@@ -18,12 +18,14 @@ type Sequencer struct {
 
 func NewSequencer(node *Layer2Node) *Sequencer {
 	node.isSequencer = true
-	return &Sequencer{
+	seq := &Sequencer{
 		node:        node,
 		blockHeight: 0,
 		//maxBlockGasLimit: 30_000_000, // 区块 gas 上限为 30,000,000
 		maxBlockGasLimit: _MaxBlockGasLimit_, // 区块 gas 上限为 30,000,000
 	}
+	node.sequencer = seq
+	return seq
 }
 
 func (s *Sequencer) Start() {
