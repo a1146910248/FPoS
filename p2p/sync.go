@@ -193,8 +193,34 @@ func (n *Layer2Node) handleStateMessages() {
 
 // 从其他节点同步状态
 func (n *Layer2Node) syncStateFromPeers() error {
+	const maxRetries = 3
+	const retryDelay = 2 * time.Second
+
+	var lastErr error
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if attempt > 0 {
+			fmt.Printf("Retry attempt %d/%d for state sync...\n", attempt+1, maxRetries)
+			time.Sleep(retryDelay)
+		}
+
+		if err := n.attemptStateSync(); err != nil {
+			lastErr = err
+			fmt.Printf("State sync attempt %d failed: %v\n", attempt+1, err)
+			continue
+		}
+
+		// 如果成功，直接返回
+		return nil
+	}
+
+	return fmt.Errorf("state sync failed after %d attempts, last error: %v", maxRetries, lastErr)
+}
+
+// 单次同步尝试
+func (n *Layer2Node) attemptStateSync() error {
 	// 首先等待一段时间，确保有足够的节点连接
 	time.Sleep(1 * time.Second)
+
 	// 创建状态同步请求
 	syncReq := &StateSync{
 		RequestID: uuid.New().String(),
@@ -359,8 +385,16 @@ func (n *Layer2Node) updateLocalState(accounts map[string]*AccountState, pending
 		fmt.Printf("State updated: accounts=%d, pendingStates=%d, pendingTxs=%d\n",
 			len(accounts), len(n.stateDB.pendingTxs), txCount)
 	}
+
 	n.mu.Lock()
 	n.latestBlock = newHeight
+	// 如果是 sequencer 节点，同时更新 sequencer 的区块高度
+	if n.isSequencer && n.sequencer != nil {
+		n.sequencer.mu.Lock()
+		n.sequencer.blockHeight = newHeight
+		n.sequencer.mu.Unlock()
+	}
+
 	// 签名的交易和账户重构完成后再同步区块，否则会出现nonce等不一致区块
 	for _, block := range blocks {
 		// 验证区块

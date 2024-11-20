@@ -44,6 +44,7 @@ type Layer2Node struct {
 	publicKey         crypto.PubKey
 	minGasPrice       uint64
 	isSequencer       bool
+	sequencer         *Sequencer
 	isSyncing         bool
 	stateDB           *StateDB
 	periodicTxStarted bool
