@@ -46,6 +46,7 @@ type Layer2Node struct {
 	isSequencer       bool
 	sequencer         *Sequencer
 	isSyncing         bool
+	initialized       bool
 	stateDB           *StateDB
 	periodicTxStarted bool
 }
@@ -136,6 +137,7 @@ func initState(node *Layer2Node, bootstrapPeers []string) error {
 	if len(bootstrapPeers) == 0 {
 		// 如果是启动节点，设置一个较大的初始余额
 		node.stateDB.UpdateBalance(pub, 1000000000000000000) // 1 ETH
+		node.initialized = true
 	} else {
 		// 如果是普通节点，设置较小的初始余额用于支付gas费
 		node.stateDB.UpdateBalance(pub, 1000000000000) // 0.001 ETH

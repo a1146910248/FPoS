@@ -22,7 +22,7 @@ func (n *Layer2Node) StartPeriodicTransaction() {
 	n.mu.Unlock()
 
 	go func() {
-		ticker := time.NewTicker(5 * time.Second)
+		ticker := time.NewTicker(50 * time.Millisecond)
 		defer ticker.Stop()
 
 		// 获取本节点的地址
@@ -83,7 +83,7 @@ func (n *Layer2Node) StartPeriodicTransaction() {
 					continue
 				}
 
-				fmt.Printf("发送交易成功: %s\n", tx.Hash)
+				//fmt.Printf("发送交易成功: %s\n", tx.Hash)
 			}
 		}
 	}()

@@ -3,6 +3,7 @@ package p2p
 import (
 	. "FPoS/types"
 	"fmt"
+	"os"
 )
 
 func (n *Layer2Node) SetTransactionHandler(handler TransactionHandler) {
@@ -63,8 +64,24 @@ func (n *Layer2Node) defaultTxValidation(tx *Transaction) bool {
 
 	// 检查nonce值
 	currentNonce := n.stateDB.GetNonce(tx.From)
-	if tx.Nonce != currentNonce+1 {
-		fmt.Printf("交易nonce无效: 期望 %d, 实际 %d\n", currentNonce+1, tx.Nonce)
+	if tx.Nonce > currentNonce+1 {
+		fmt.Printf("Transaction nonce invalid: expected %d, got %d, triggering sync\n",
+			currentNonce+1, tx.Nonce)
+
+		// 触发同步
+		if os.Getenv("BOOTSTRAP") != "true" {
+			go func() {
+				n.isSyncing = true
+				if err := n.syncStateFromPeers(); err != nil {
+					fmt.Printf("State sync failed: %v\n", err)
+				}
+			}()
+		}
+
+		return false
+	} else if tx.Nonce < currentNonce+1 {
+		fmt.Printf("Transaction nonce too low: expected %d, got %d\n",
+			currentNonce+1, tx.Nonce)
 		return false
 	}
 
@@ -171,7 +188,7 @@ func (n *Layer2Node) validateTxForBlock(tx *Transaction, isHistoricalBlock bool)
 	}
 
 	// Gas和余额检查
-	if err := n.stateDB.ValidateTransaction(tx, n.minGasPrice); err != nil {
+	if err := n.stateDB.ValidateTransactionForBlock(tx, n.minGasPrice); err != nil {
 		fmt.Println("交易验证不通过：", err)
 		return false
 	}
