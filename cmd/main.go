@@ -53,11 +53,6 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		if enableTx {
-			// 启动定时交易
-			node.StartPeriodicTransaction()
-			fmt.Println("已启动定时交易发送")
-		}
 		// TODO 如果是排序器节点，之后会加入共识
 		if isSequencer {
 			// 启动排序器节点
@@ -68,6 +63,12 @@ func main() {
 		if err := node.Start(); err != nil {
 			panic(err)
 		}
+		if enableTx {
+			// 启动定时交易
+			node.StartPeriodicTransaction()
+			fmt.Println("已启动定时交易发送")
+		}
+
 		fmt.Printf("Node started with bootstrap: %s\n", bootstrapAddr)
 	}
 	sigChan := make(chan os.Signal, 1)

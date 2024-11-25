@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-const _MaxBlockGasLimit_ = 800
+const _MaxBlockGasLimit_ = 21000
 
 type Sequencer struct {
 	node             *Layer2Node
@@ -29,7 +29,22 @@ func NewSequencer(node *Layer2Node) *Sequencer {
 }
 
 func (s *Sequencer) Start() {
-	go s.blockProducingLoop()
+	go func() {
+		// 等待节点初始化完成
+		for {
+			s.node.mu.RLock()
+			initialized := s.node.initialized
+			s.node.mu.RUnlock()
+
+			if initialized {
+				break
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+
+		fmt.Println("Sequencer starting block production after node initialization")
+		s.blockProducingLoop()
+	}()
 }
 
 func (s *Sequencer) blockProducingLoop() {

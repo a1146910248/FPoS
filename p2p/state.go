@@ -34,6 +34,7 @@ type PendingState struct {
 
 // StateSync 状态同步请求和响应的消息结构
 type StateSync struct {
+	Type         MessageType              `json:"type"`
 	RequestID    string                   `json:"requestId"`
 	FromHeight   uint64                   `json:"fromHeight"`
 	ToHeight     uint64                   `json:"toHeight"`
@@ -157,6 +158,50 @@ func (s *StateDB) ValidateTransaction(tx *types.Transaction, minGasPrice uint64)
 	// 更新待处理状态
 	pending.pendingBalance -= totalCost
 	pending.pendingNonce++
+
+	return nil
+}
+
+// ValidateTransactionForBlock 验证交易
+func (s *StateDB) ValidateTransactionForBlock(tx *types.Transaction, minGasPrice uint64) error {
+	// 检查gas相关参数
+	if tx.GasLimit < tx.GasUsed {
+		return fmt.Errorf("gas usage overrun: %d > %d", tx.GasUsed, tx.GasLimit)
+	}
+	if tx.GasPrice < minGasPrice {
+		return fmt.Errorf("gas price too low, minimum required: %d", minGasPrice)
+	}
+
+	sender := s.GetAccount(tx.From)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// 获取或创建待处理状态
+	pending, exists := s.pendingTxs[tx.From]
+	if !exists {
+		pending = &PendingState{
+			pendingBalance: sender.Balance,
+			pendingNonce:   sender.Nonce,
+		}
+		s.pendingTxs[tx.From] = pending
+	}
+
+	pending.mu.Lock()
+	defer pending.mu.Unlock()
+
+	// 计算交易需要的总费用
+	gasFeeCost := tx.GasUsed * tx.GasPrice
+	totalCost := gasFeeCost + tx.Value
+
+	// 检查发送方余额
+	sender.mu.RLock()
+	defer sender.mu.RUnlock()
+
+	// 检查待处理余额是否足够
+	if pending.pendingBalance < totalCost {
+		return fmt.Errorf("insufficient balance (including pending): has %d, needs %d",
+			pending.pendingBalance, totalCost)
+	}
 
 	return nil
 }

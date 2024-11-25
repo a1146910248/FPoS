@@ -28,11 +28,6 @@ func (n *Layer2Node) processNewBlock(block Block, isHistoricalBlock bool) error 
 	// 使用新的方法原子性地处理交易池和待处理状态
 	n.cleanTxPoolAndPendingStates(block.Transactions)
 
-	// 应用交易
-	if err := n.applyTransactions(block.Transactions); err != nil {
-		return err
-	}
-
 	// 更新状态
 	n.latestBlock = block.Height
 	n.stateRoot = block.StateRoot
@@ -268,6 +263,9 @@ func (n *Layer2Node) cleanTxPoolAndPendingStates(txs []Transaction) {
 		n.txPool.Delete(key)
 	}
 	n.stateDB.mu.Unlock()
+
+	// 应用交易
+	n.applyTransactions(txs)
 	// 更新每个地址的待处理状态
 	for address := range txsByAddress {
 		// 重置待处理状态到最新确认的 nonce

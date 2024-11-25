@@ -4,12 +4,34 @@ import (
 	. "FPoS/types"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"os"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 )
+
+const MaxMessageSize = 1024 * 512 // 0.5MB限制
+
+// 添加消息类型标识
+type MessageType int
+
+const (
+	SyncReq MessageType = iota
+	SyncResponse
+	SyncChunk
+)
+
+type StateChunk struct {
+	Type        MessageType `json:"type"` // 添加消息类型
+	RequestID   string      `json:"request_id"`
+	ChunkIndex  int         `json:"chunk_index"`
+	TotalChunks int         `json:"total_chunks"`
+	Data        []byte      `json:"data"`
+	IsFinal     bool        `json:"is_final"`
+}
 
 func (n *Layer2Node) setupTopics() error {
 	txTopic, err := n.pubsub.Join("l2_transactions")
@@ -48,16 +70,20 @@ func (n *Layer2Node) handleTxMessages() {
 		return
 	}
 
-	pendingMsgs := make(chan *pendingMessage, 1000)
+	// 创建一个带缓冲的通道用于消息队列
+	pendingMsgs := make(chan *pendingMessage, 10000)
 
+	// 启动消费者协程
 	go func() {
 		for pending := range pendingMsgs {
+			// 等待初始化和同步完成
 			for {
 				n.mu.RLock()
+				initialized := n.initialized
 				isSyncing := n.isSyncing
 				n.mu.RUnlock()
 
-				if !isSyncing {
+				if initialized && !isSyncing {
 					break
 				}
 				time.Sleep(100 * time.Millisecond)
@@ -74,12 +100,12 @@ func (n *Layer2Node) handleTxMessages() {
 					n.txPool.Store(tx.Hash, tx)
 					fmt.Printf("Processed pending transaction: from=%s, nonce=%d\n",
 						tx.From, tx.Nonce)
-					// 移除重复广播
 				}
 			}
 		}
 	}()
 
+	// 生产者循环
 	for {
 		msg, err := sub.Next(n.ctx)
 		if err != nil {
@@ -87,10 +113,17 @@ func (n *Layer2Node) handleTxMessages() {
 		}
 
 		n.mu.RLock()
+		initialized := n.initialized
 		isSyncing := n.isSyncing
 		n.mu.RUnlock()
 
-		if isSyncing {
+		// 如果未初始化，直接丢弃消息
+		if !initialized {
+			continue
+		}
+
+		// 如果正在同步，或者消息队列不为空，将消息放入队列
+		if isSyncing || len(pendingMsgs) > 0 {
 			select {
 			case pendingMsgs <- &pendingMessage{
 				msg:       msg,
@@ -103,13 +136,14 @@ func (n *Layer2Node) handleTxMessages() {
 			continue
 		}
 
+		// 如果不在同步且队列为空，直接处理消息
 		var tx Transaction
 		if err := json.Unmarshal(msg.Data, &tx); err == nil {
 			if n.validateTransaction(tx) {
 				n.txPool.Store(tx.Hash, tx)
-				fmt.Printf("Received new transaction: from=%s, nonce=%d\n",
+				fmt.Printf("Processed transaction directly: from=%s, nonce=%d\n",
 					tx.From, tx.Nonce)
-				n.BroadcastTransaction(tx) // 只在这里广播一次
+				n.BroadcastTransaction(tx)
 			}
 		}
 	}
@@ -212,7 +246,7 @@ func (n *Layer2Node) syncStateFromPeers() error {
 		// 如果成功，直接返回
 		return nil
 	}
-
+	os.Exit(1)
 	return fmt.Errorf("state sync failed after %d attempts, last error: %v", maxRetries, lastErr)
 }
 
@@ -239,7 +273,12 @@ func (n *Layer2Node) attemptStateSync() error {
 
 	// 等待响应的通道
 	responseChan := make(chan *StateSync)
-	timeout := time.After(10 * time.Second)
+	timeout := time.After(30 * time.Second)
+
+	// 用于存储接收到的分片
+	chunkMap := make(map[int][]byte)
+	var totalChunks int = -1
+	requestID := syncReq.RequestID // 保存请求ID
 
 	// 设置一次性的消息处理器来接收响应
 	sub, err := n.stateTopic.Subscribe()
@@ -262,14 +301,51 @@ func (n *Layer2Node) attemptStateSync() error {
 				continue
 			}
 
-			var syncResp StateSync
-			if err := json.Unmarshal(msg.Data, &syncResp); err != nil {
-				fmt.Printf("Error unmarshaling sync response: %s\n", err)
+			var chunk StateChunk
+			if err := json.Unmarshal(msg.Data, &chunk); err != nil {
+				fmt.Printf("Error unmarshaling chunk: %s\n", err)
 				continue
 			}
 
-			// 如果是对我们请求的响应
-			if syncResp.Accounts != nil {
+			// 验证请求ID
+			if chunk.RequestID != requestID {
+				fmt.Printf("Received chunk for different request: %s (expected %s)\n",
+					chunk.RequestID, requestID)
+				continue
+			}
+
+			// 打印接收到的分片信息
+			fmt.Printf("Received chunk %d/%d, size: %d bytes\n",
+				chunk.ChunkIndex+1, chunk.TotalChunks, len(chunk.Data))
+
+			// 存储分片
+			chunkMap[chunk.ChunkIndex] = chunk.Data
+			if totalChunks == -1 {
+				totalChunks = chunk.TotalChunks
+				fmt.Printf("Total chunks to receive: %d\n", totalChunks)
+			}
+
+			// 检查是否收到所有分片
+			if len(chunkMap) == totalChunks {
+				fmt.Printf("Received all %d chunks, reconstructing data...\n", totalChunks)
+
+				// 重建完整响应
+				fullData := make([]byte, 0)
+				for i := 0; i < totalChunks; i++ {
+					if data, exists := chunkMap[i]; exists {
+						fullData = append(fullData, data...)
+					} else {
+						fmt.Printf("Missing chunk %d\n", i)
+						return
+					}
+				}
+
+				var syncResp StateSync
+				if err := json.Unmarshal(fullData, &syncResp); err != nil {
+					fmt.Printf("Error unmarshaling complete response: %s\n", err)
+					return
+				}
+
 				responseChan <- &syncResp
 				return
 			}
@@ -279,9 +355,8 @@ func (n *Layer2Node) attemptStateSync() error {
 	// 等待响应或超时
 	select {
 	case resp := <-responseChan:
-		// 更新本地状态
 		n.updateLocalState(resp.Accounts, resp.PendingTxs, resp.Blocks, resp.ToHeight)
-		fmt.Printf("----------------------------------------Successfully synced state from peers----------------------------------------\n\n")
+		fmt.Printf("---------------------------------------------Successfully synced state from peers---------------------------------------------\n")
 		return nil
 	case <-timeout:
 		return fmt.Errorf("state sync timed out")
@@ -291,10 +366,16 @@ func (n *Layer2Node) attemptStateSync() error {
 func (n *Layer2Node) updateLocalState(accounts map[string]*AccountState, pendingTxs []Transaction, blocks []Block, newHeight uint64) {
 	n.mu.Lock()
 	n.isSyncing = true
+	wasInitialized := n.initialized
 	n.mu.Unlock()
+
 	defer func() {
 		n.mu.Lock()
 		n.isSyncing = false
+		if !wasInitialized {
+			n.initialized = true
+			fmt.Println("Node initialization completed")
+		}
 		n.mu.Unlock()
 	}()
 
@@ -440,76 +521,121 @@ func (n *Layer2Node) revalidateTransactionPool() {
 
 // 处理状态同步请求
 func (n *Layer2Node) handleStateSync(msg *pubsub.Message) {
-	var syncReq StateSync
-	if err := json.Unmarshal(msg.Data, &syncReq); err != nil {
-		fmt.Printf("Error unmarshaling sync request: %s\n", err)
+	if pb, _ := PublicKeyToAddress(n.publicKey); pb != "0x8f00527c4f08eb89f9158f9fe14545b868e0498d" {
+		return
+	}
+	// 首先尝试解析为StateChunk
+	var chunk StateChunk
+	if err := json.Unmarshal(msg.Data, &chunk); err == nil && chunk.Type == SyncChunk {
+		// 这是一个分片消息，直接返回
 		return
 	}
 
-	// 如果是同步请求（没有accounts字段）
-	if syncReq.Accounts == nil {
-		// 准备响应
-		n.stateDB.mu.RLock()
-		accounts := make(map[string]*AccountState)
-		for addr, state := range n.stateDB.accounts {
-			accounts[addr] = &AccountState{
-				Balance:       state.Balance,
-				Nonce:         state.Nonce,
-				PublicKey:     state.PublicKey,
-				PublicKeyType: state.PublicKeyType,
+	// 如果不是分片消息，则尝试解析为StateSync
+	var syncReq StateSync
+	if err := json.Unmarshal(msg.Data, &syncReq); err != nil {
+		fmt.Printf("Error unmarshaling message: %s\n", err)
+		return
+	}
+
+	// 只处理同步请求
+	if syncReq.Type != SyncReq {
+		return
+	}
+
+	// 准备响应数据
+	n.stateDB.mu.RLock()
+	accounts := make(map[string]*AccountState)
+	for addr, state := range n.stateDB.accounts {
+		accounts[addr] = &AccountState{
+			Balance:       state.Balance,
+			Nonce:         state.Nonce,
+			PublicKey:     state.PublicKey,
+			PublicKeyType: state.PublicKeyType,
+		}
+	}
+	// 收集交易池中的交易
+	var pendingTxs []Transaction
+	n.txPool.Range(func(_, value interface{}) bool {
+		if tx, ok := value.(Transaction); ok {
+			pendingTxs = append(pendingTxs, tx)
+		}
+		return true
+	})
+	n.stateDB.mu.RUnlock()
+
+	// 添加待处理状态信息
+	pendingStates := make(map[string]*PendingState)
+	for addr, pending := range n.stateDB.pendingTxs {
+		pending.mu.RLock()
+		pendingStates[addr] = &PendingState{
+			pendingBalance: pending.pendingBalance,
+			pendingNonce:   pending.pendingNonce,
+		}
+		pending.mu.RUnlock()
+	}
+
+	// 收集区块信息
+	blocks := make([]Block, 0)
+	for height := syncReq.FromHeight; height <= n.latestBlock; height++ {
+		if blockInterface, exists := n.blockCache.Load(height); exists {
+			if block, ok := blockInterface.(Block); ok {
+				blocks = append(blocks, block)
 			}
 		}
-		// 收集交易池中的交易
-		var pendingTxs []Transaction
-		n.txPool.Range(func(_, value interface{}) bool {
-			if tx, ok := value.(Transaction); ok {
-				pendingTxs = append(pendingTxs, tx)
-			}
-			return true
-		})
-		n.stateDB.mu.RUnlock()
+	}
 
-		// 添加待处理状态信息
-		pendingStates := make(map[string]*PendingState)
-		for addr, pending := range n.stateDB.pendingTxs {
-			pending.mu.RLock()
-			pendingStates[addr] = &PendingState{
-				pendingBalance: pending.pendingBalance,
-				pendingNonce:   pending.pendingNonce,
-			}
-			pending.mu.RUnlock()
+	response := &StateSync{
+		Type:         SyncResponse,
+		RequestID:    syncReq.RequestID,
+		Accounts:     accounts,
+		PendingState: pendingStates,
+		PendingTxs:   pendingTxs,
+		Blocks:       blocks,
+		FromHeight:   syncReq.FromHeight,
+		ToHeight:     n.latestBlock,
+	}
+
+	// 序列化完整响应
+	fullData, err := json.Marshal(response)
+	if err != nil {
+		fmt.Printf("Error marshaling sync response: %s\n", err)
+		return
+	}
+
+	// 计算分片
+	totalChunks := (len(fullData) + MaxMessageSize - 1) / MaxMessageSize
+	fmt.Printf("Splitting response into %d chunks\n", totalChunks)
+
+	// 分片发送
+	for i := 0; i < totalChunks; i++ {
+		start := i * MaxMessageSize
+		end := start + MaxMessageSize
+		if end > len(fullData) {
+			end = len(fullData)
 		}
 
-		// 收集区块信息
-		blocks := make([]Block, 0)
-		for height := syncReq.FromHeight; height <= n.latestBlock; height++ {
-			if blockInterface, exists := n.blockCache.Load(height); exists {
-				if block, ok := blockInterface.(Block); ok {
-					blocks = append(blocks, block)
-				}
-			}
+		chunk := StateChunk{
+			Type:        SyncChunk,
+			RequestID:   syncReq.RequestID,
+			ChunkIndex:  i,
+			TotalChunks: totalChunks,
+			Data:        fullData[start:end],
+			IsFinal:     i == totalChunks-1,
 		}
 
-		response := &StateSync{
-			RequestID:    syncReq.RequestID,
-			Accounts:     accounts,
-			PendingState: pendingStates, // 添加待处理状态
-			PendingTxs:   pendingTxs,
-			Blocks:       blocks,
-			FromHeight:   syncReq.FromHeight,
-			ToHeight:     n.latestBlock,
-		}
-
-		// 序列化并发送响应
-		respData, err := json.Marshal(response)
+		chunkData, err := json.Marshal(chunk)
 		if err != nil {
-			fmt.Printf("Error marshaling sync response: %s\n", err)
-			return
+			fmt.Printf("Error marshaling chunk %d: %s\n", i, err)
+			continue
 		}
 
-		if err := n.stateTopic.Publish(n.ctx, respData); err != nil {
-			fmt.Printf("Error publishing sync response: %s\n", err)
-			return
+		if err := n.stateTopic.Publish(n.ctx, chunkData); err != nil {
+			fmt.Printf("Error publishing chunk %d/%d: %s\n", i+1, totalChunks, err)
+			continue
 		}
+
+		fmt.Printf("Sent chunk %d/%d, size: %d bytes\n", i+1, totalChunks, len(chunk.Data))
+		//time.Sleep(200 * time.Millisecond)
 	}
 }
