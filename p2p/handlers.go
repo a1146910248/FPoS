@@ -3,7 +3,6 @@ package p2p
 import (
 	. "FPoS/types"
 	"fmt"
-	"os"
 )
 
 func (n *Layer2Node) SetTransactionHandler(handler TransactionHandler) {
@@ -69,14 +68,14 @@ func (n *Layer2Node) defaultTxValidation(tx *Transaction) bool {
 			currentNonce+1, tx.Nonce)
 
 		// 触发同步
-		if os.Getenv("BOOTSTRAP") != "true" {
-			go func() {
-				n.isSyncing = true
-				if err := n.syncStateFromPeers(); err != nil {
-					fmt.Printf("State sync failed: %v\n", err)
-				}
-			}()
-		}
+		//if os.Getenv("BOOTSTRAP") != "true" {
+		//	go func() {
+		//		n.isSyncing = true
+		//		if err := n.syncStateFromPeers(); err != nil {
+		//			fmt.Printf("State sync failed: %v\n", err)
+		//		}
+		//	}()
+		//}
 
 		return false
 	} else if tx.Nonce < currentNonce+1 {
