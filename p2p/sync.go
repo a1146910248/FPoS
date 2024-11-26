@@ -113,14 +113,14 @@ func (n *Layer2Node) handleTxMessages() {
 		}
 
 		n.mu.RLock()
-		initialized := n.initialized
+		//initialized := n.initialized
 		isSyncing := n.isSyncing
 		n.mu.RUnlock()
 
-		// 如果未初始化，直接丢弃消息
-		if !initialized {
-			continue
-		}
+		// 如果已经初始化，直接丢弃消息
+		//if initialized {
+		//	continue
+		//}
 
 		// 如果正在同步，或者消息队列不为空，将消息放入队列
 		if isSyncing || len(pendingMsgs) > 0 {

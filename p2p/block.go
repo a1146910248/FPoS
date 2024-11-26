@@ -303,11 +303,6 @@ func (n *Layer2Node) processNewBlockInternal(block Block, isHistoricalBlock bool
 	// 使用新的方法原子性地处理交易池和待处理状态
 	n.cleanTxPoolAndPendingStates(block.Transactions)
 
-	// 应用交易
-	if err := n.applyTransactions(block.Transactions); err != nil {
-		return err
-	}
-
 	// 更新状态
 	n.latestBlock = block.Height
 	n.stateRoot = block.StateRoot
