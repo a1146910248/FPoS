@@ -2,7 +2,13 @@ package p2p
 
 import (
 	. "FPoS/types"
+	"encoding/json"
 	"fmt"
+	"os"
+	"sort"
+
+	"github.com/google/uuid"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 )
 
 func (n *Layer2Node) SetTransactionHandler(handler TransactionHandler) {
@@ -64,19 +70,30 @@ func (n *Layer2Node) defaultTxValidation(tx *Transaction) bool {
 	// 检查nonce值
 	currentNonce := n.stateDB.GetNonce(tx.From)
 	if tx.Nonce > currentNonce+1 {
-		fmt.Printf("Transaction nonce invalid: expected %d, got %d, triggering sync\n",
-			currentNonce+1, tx.Nonce)
+		fmt.Printf("Transaction nonce gap detected: current=%d, received=%d\n",
+			currentNonce, tx.Nonce)
 
-		// 触发同步
-		//if os.Getenv("BOOTSTRAP") != "true" {
-		//	go func() {
-		//		n.isSyncing = true
-		//		if err := n.syncStateFromPeers(); err != nil {
-		//			fmt.Printf("State sync failed: %v\n", err)
-		//		}
-		//	}()
-		//}
+		// 触发交易同步
+		if os.Getenv("BOOTSTRAP") != "true" {
+			go func() {
+				n.mu.Lock()
+				if n.isSyncing {
+					n.mu.Unlock()
+					return
+				}
+				n.isSyncing = true
+				n.mu.Unlock()
 
+				// 请求缺失的交易
+				if err := n.syncMissingTransactions(tx.From, currentNonce+1, tx.Nonce); err != nil {
+					fmt.Printf("Missing transactions sync failed: %v\n", err)
+				}
+
+				n.mu.Lock()
+				n.isSyncing = false
+				n.mu.Unlock()
+			}()
+		}
 		return false
 	} else if tx.Nonce < currentNonce+1 {
 		fmt.Printf("Transaction nonce too low: expected %d, got %d\n",
@@ -246,4 +263,107 @@ func (n *Layer2Node) validateBlockInternal(block Block, isHistoricalBlock bool) 
 		return false
 	}
 	return true
+}
+
+// 交易同步请求结构
+type TxSyncReq struct {
+	Type      MessageType `json:"type"`
+	RequestID string      `json:"request_id"`
+	Address   string      `json:"address"`
+	FromNonce uint64      `json:"from_nonce"`
+	ToNonce   uint64      `json:"to_nonce"`
+}
+
+// 交易同步响应结构
+type TxSyncRsp struct {
+	Type         MessageType   `json:"type"`
+	RequestID    string        `json:"request_id"`
+	Address      string        `json:"address"`
+	Transactions []Transaction `json:"transactions"`
+}
+
+// 同步缺失的交易
+func (n *Layer2Node) syncMissingTransactions(address string, fromNonce, toNonce uint64) error {
+	requestID := uuid.New().String()
+	n.currentSyncRequestID = requestID // 记录当前请求ID
+
+	req := TxSyncReq{
+		Type:      TxSyncRequest,
+		RequestID: requestID,
+		Address:   address,
+		FromNonce: fromNonce,
+		ToNonce:   toNonce,
+	}
+
+	data, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("failed to marshal tx sync request: %w", err)
+	}
+
+	// 发布同步请求
+	if err := n.txSyncTopic.Publish(n.ctx, data); err != nil {
+		return fmt.Errorf("failed to publish tx sync request: %w", err)
+	}
+
+	fmt.Printf("Requested missing transactions for %s from nonce %d to %d\n",
+		address, fromNonce, toNonce)
+	return nil
+}
+
+// 处理交易同步请求
+func (n *Layer2Node) handleTxSyncRequest(msg *pubsub.Message) {
+	var req TxSyncReq
+	if err := json.Unmarshal(msg.Data, &req); err != nil {
+		return
+	}
+
+	// 收集请求范围内的交易
+	var transactions []Transaction
+	n.txPool.Range(func(_, value interface{}) bool {
+		if tx, ok := value.(Transaction); ok {
+			if tx.From == req.Address &&
+				tx.Nonce >= req.FromNonce &&
+				tx.Nonce <= req.ToNonce {
+				transactions = append(transactions, tx)
+			}
+		}
+		return true
+	})
+
+	// 按 nonce 排序
+	sort.Slice(transactions, func(i, j int) bool {
+		return transactions[i].Nonce < transactions[j].Nonce
+	})
+
+	// 发送响应
+	resp := TxSyncRsp{
+		Type:         TxSyncResponse,
+		RequestID:    req.RequestID,
+		Address:      req.Address,
+		Transactions: transactions,
+	}
+
+	data, err := json.Marshal(resp)
+	if err != nil {
+		return
+	}
+
+	n.txSyncTopic.Publish(n.ctx, data)
+}
+
+// 处理交易同步响应
+func (n *Layer2Node) handleTxSyncResponse(msg *pubsub.Message) {
+	var resp TxSyncRsp
+	if err := json.Unmarshal(msg.Data, &resp); err != nil {
+		return
+	}
+
+	// 按顺序处理交易
+	for _, tx := range resp.Transactions {
+		if n.validateTransaction(tx) {
+			n.txPool.Store(tx.Hash, tx)
+			fmt.Printf("Synced missing transaction: from=%s, nonce=%d\n",
+				tx.From, tx.Nonce)
+		}
+	}
 }

@@ -22,6 +22,8 @@ const (
 	SyncReq MessageType = iota
 	SyncResponse
 	SyncChunk
+	TxSyncRequest
+	TxSyncResponse
 )
 
 type StateChunk struct {
@@ -52,9 +54,17 @@ func (n *Layer2Node) setupTopics() error {
 	}
 	n.stateTopic = stateTopic
 
+	// 添加交易同步专用 topic
+	txSyncTopic, err := n.pubsub.Join("l2_tx_sync")
+	if err != nil {
+		return err
+	}
+	n.txSyncTopic = txSyncTopic
+
 	go n.handleTxMessages()
 	go n.handleBlockMessages()
 	go n.handleStateMessages()
+	go n.handleTxSyncMessages()
 
 	return nil
 }
@@ -79,11 +89,10 @@ func (n *Layer2Node) handleTxMessages() {
 			// 等待初始化和同步完成
 			for {
 				n.mu.RLock()
-				initialized := n.initialized
 				isSyncing := n.isSyncing
 				n.mu.RUnlock()
 
-				if initialized && !isSyncing {
+				if !isSyncing {
 					break
 				}
 				time.Sleep(100 * time.Millisecond)
@@ -143,7 +152,7 @@ func (n *Layer2Node) handleTxMessages() {
 				n.txPool.Store(tx.Hash, tx)
 				fmt.Printf("Processed transaction directly: from=%s, nonce=%d\n",
 					tx.From, tx.Nonce)
-				n.BroadcastTransaction(tx)
+				//n.BroadcastTransaction(tx)
 			}
 		}
 	}
@@ -223,6 +232,53 @@ func (n *Layer2Node) handleStateMessages() {
 	//		n.updateState(state.StateRoot, state.Height)
 	//	}
 	//}
+}
+
+// 处理交易同步消息
+func (n *Layer2Node) handleTxSyncMessages() {
+	sub, err := n.txSyncTopic.Subscribe()
+	if err != nil {
+		return
+	}
+
+	for {
+		msg, err := sub.Next(n.ctx)
+		if err != nil {
+			continue
+		}
+
+		// 跳过自己发送的消息
+		if msg.ReceivedFrom == n.host.ID() {
+			continue
+		}
+
+		var msgType struct {
+			Type MessageType `json:"type"`
+		}
+		if err := json.Unmarshal(msg.Data, &msgType); err != nil {
+			continue
+		}
+
+		switch msgType.Type {
+		case TxSyncRequest:
+			var req TxSyncReq
+			if err := json.Unmarshal(msg.Data, &req); err != nil {
+				continue
+			}
+			// 检查是否持有请求的交易
+			n.handleTxSyncRequest(msg)
+
+		case TxSyncResponse:
+			var resp TxSyncRsp
+			if err := json.Unmarshal(msg.Data, &resp); err != nil {
+				continue
+			}
+			// 检查是否是发给自己的响应
+			if resp.RequestID == n.currentSyncRequestID {
+				n.handleTxSyncResponse(msg)
+			}
+		}
+	}
 }
 
 // 从其他节点同步状态
@@ -379,7 +435,7 @@ func (n *Layer2Node) updateLocalState(accounts map[string]*AccountState, pending
 		n.mu.Unlock()
 	}()
 
-	n.stateDB.mu.Lock()
+	n.stateDB.Lock()
 	// 更新账户状态
 	for addr, newState := range accounts {
 		if existingState, exists := n.stateDB.accounts[addr]; exists {
@@ -393,11 +449,11 @@ func (n *Layer2Node) updateLocalState(accounts map[string]*AccountState, pending
 			}
 		}
 	}
-	n.stateDB.mu.Unlock()
+	n.stateDB.Unlock()
 
 	// 清空现有的交易池和待处理状态
 	n.txPool = &sync.Map{}
-	n.stateDB.mu.Lock()
+	n.stateDB.Lock()
 	n.stateDB.pendingTxs = make(map[string]*PendingState)
 
 	// 按发送方地址和nonce排序交易
@@ -407,18 +463,19 @@ func (n *Layer2Node) updateLocalState(accounts map[string]*AccountState, pending
 		}
 		return pendingTxs[i].From < pendingTxs[j].From
 	})
-	n.stateDB.mu.Unlock()
+	n.stateDB.Unlock()
 	// 重新验证并添加交易，同时更新待处理状态
 	for _, tx := range pendingTxs {
 		if err := n.stateDB.ValidateTransaction(&tx, n.minGasPrice); err == nil {
-			n.stateDB.mu.Lock()
+			txAccount := n.stateDB.GetAccount(tx.From)
+			n.stateDB.Lock()
 			// 交易有效，添加到交易池
 			n.txPool.Store(tx.Hash, tx)
 
 			// 更新或创建待处理状态
 			pending, exists := n.stateDB.pendingTxs[tx.From]
 			if !exists {
-				account := n.stateDB.GetAccount(tx.From)
+				account := txAccount
 				pending = &PendingState{
 					pendingBalance: account.Balance,
 					pendingNonce:   account.Nonce,
@@ -427,7 +484,7 @@ func (n *Layer2Node) updateLocalState(accounts map[string]*AccountState, pending
 				n.stateDB.pendingTxs[tx.From] = pending
 			}
 
-			n.stateDB.mu.Unlock()
+			n.stateDB.Unlock()
 		} else {
 			fmt.Printf("Invalid transaction during sync: %s, error: %v\n", tx.Hash, err)
 		}

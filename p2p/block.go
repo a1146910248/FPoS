@@ -236,7 +236,7 @@ func CalculateBlockHash(block *Block) (string, error) {
 	return hex.EncodeToString(hash[:]), nil
 }
 func (n *Layer2Node) cleanTxPoolAndPendingStates(txs []Transaction) {
-	n.stateDB.mu.Lock()
+	n.stateDB.Lock()
 
 	// 创建交易 map 用于快速查找
 	txHashes := make(map[string]struct{})
@@ -262,7 +262,7 @@ func (n *Layer2Node) cleanTxPoolAndPendingStates(txs []Transaction) {
 	for _, key := range txsToRemove {
 		n.txPool.Delete(key)
 	}
-	n.stateDB.mu.Unlock()
+	n.stateDB.Unlock()
 
 	// 应用交易
 	n.applyTransactions(txs)

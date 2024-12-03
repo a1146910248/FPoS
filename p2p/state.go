@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/libp2p/go-libp2p/core/crypto"
+	"runtime"
 	"sync"
 )
 
@@ -59,13 +60,13 @@ func (s *StateDB) GetAccount(address string) *AccountState {
 	s.mu.RUnlock()
 
 	if !exists {
-		s.mu.Lock()
+		s.Lock()
 		// 双重检查
 		if account, exists = s.accounts[address]; !exists {
 			account = &AccountState{}
 			s.accounts[address] = account
 		}
-		s.mu.Unlock()
+		s.Unlock()
 	}
 
 	return account
@@ -125,8 +126,8 @@ func (s *StateDB) ValidateTransaction(tx *types.Transaction, minGasPrice uint64)
 	}
 
 	sender := s.GetAccount(tx.From)
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.Lock()
+	defer s.Unlock()
 
 	// 获取或创建待处理状态
 	pending, exists := s.pendingTxs[tx.From]
@@ -173,8 +174,8 @@ func (s *StateDB) ValidateTransactionForBlock(tx *types.Transaction, minGasPrice
 	}
 
 	sender := s.GetAccount(tx.From)
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	// 获取或创建待处理状态
 	pending, exists := s.pendingTxs[tx.From]
@@ -208,15 +209,15 @@ func (s *StateDB) ValidateTransactionForBlock(tx *types.Transaction, minGasPrice
 
 // CleanPendingState 当交易被打包进区块时，清理待处理状态
 func (s *StateDB) CleanPendingState(address string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.Lock()
+	defer s.Unlock()
 	delete(s.pendingTxs, address)
 }
 
 // RestorePendingState 当交易从交易池移除时，恢复待处理状态
 func (s *StateDB) RestorePendingState(tx *types.Transaction) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.Lock()
+	defer s.Unlock()
 
 	if pending, exists := s.pendingTxs[tx.From]; exists {
 		pending.mu.Lock()
@@ -278,8 +279,8 @@ func (s *StateDB) GetStateRoot() string {
 func (s *StateDB) ResetPendingNonce(address string) {
 	account := s.GetAccount(address)
 	confirmedNonce := account.Nonce
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.Lock()
+	defer s.Unlock()
 
 	if pending, exists := s.pendingTxs[address]; exists {
 		pending.mu.Lock()
@@ -313,8 +314,8 @@ func (s *StateDB) SetAccountPublicKey(address string, pubKey crypto.PubKey) erro
 	}
 
 	account := s.GetAccount(address)
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.Lock()
+	defer s.Unlock()
 	account.mu.Lock()
 	account.PublicKey = pubKeyBytes
 	account.PublicKeyType = keyType
@@ -347,4 +348,22 @@ func (s *StateDB) GetAccountPublicKey(address string) (crypto.PubKey, error) {
 	default:
 		return nil, fmt.Errorf("unsupported key type: %s", keyType)
 	}
+}
+
+func (s *StateDB) Lock() {
+	//fmt.Printf("Attempting to acquire lock at: %s\n", getStackTrace())
+	s.mu.Lock()
+	//fmt.Printf("Lock acquired at: %s\n", getStackTrace())
+}
+
+func (s *StateDB) Unlock() {
+	//fmt.Printf("Unlocking at: %s\n", getStackTrace())
+	s.mu.Unlock()
+}
+
+// 获取调用栈信息
+func getStackTrace() string {
+	stack := make([]byte, 4096)
+	n := runtime.Stack(stack, false)
+	return string(stack[:n])
 }

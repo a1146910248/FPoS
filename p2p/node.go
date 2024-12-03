@@ -25,30 +25,32 @@ import (
 )
 
 type Layer2Node struct {
-	host              host.Host
-	dht               *dht.IpfsDHT
-	pubsub            *pubsub.PubSub
-	txTopic           *pubsub.Topic
-	blockTopic        *pubsub.Topic
-	stateTopic        *pubsub.Topic
-	ctx               context.Context
-	blockCache        *sync.Map
-	txPool            *sync.Map
-	stateRoot         string
-	latestBlock       uint64
-	handlers          types.Handlers
-	pingService       *ping.PingService
-	bootstrapPeers    []string
-	mu                sync.RWMutex
-	privateKey        crypto.PrivKey
-	publicKey         crypto.PubKey
-	minGasPrice       uint64
-	isSequencer       bool
-	sequencer         *Sequencer
-	isSyncing         bool
-	initialized       bool
-	stateDB           *StateDB
-	periodicTxStarted bool
+	host                 host.Host
+	dht                  *dht.IpfsDHT
+	pubsub               *pubsub.PubSub
+	txTopic              *pubsub.Topic
+	blockTopic           *pubsub.Topic
+	stateTopic           *pubsub.Topic
+	txSyncTopic          *pubsub.Topic
+	ctx                  context.Context
+	blockCache           *sync.Map
+	txPool               *sync.Map
+	stateRoot            string
+	latestBlock          uint64
+	handlers             types.Handlers
+	pingService          *ping.PingService
+	bootstrapPeers       []string
+	mu                   sync.RWMutex
+	privateKey           crypto.PrivKey
+	publicKey            crypto.PubKey
+	minGasPrice          uint64
+	isSequencer          bool
+	sequencer            *Sequencer
+	currentSyncRequestID string // 当前交易同步请求ID
+	isSyncing            bool
+	initialized          bool
+	stateDB              *StateDB
+	periodicTxStarted    bool
 }
 
 func NewLayer2Node(ctx context.Context, port int, bootstrapPeers []string, privKeyBytes []byte) (*Layer2Node, error) {
