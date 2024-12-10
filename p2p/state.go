@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	. "FPoS/core/consensus"
 	"FPoS/types"
 	"crypto/sha256"
 	"encoding/json"
@@ -43,6 +44,7 @@ type StateSync struct {
 	PendingState map[string]*PendingState `json:"pendingState,omitempty"`
 	PendingTxs   []types.Transaction      `json:"pendingTxs,omitempty"`
 	Blocks       []types.Block            `json:"blocks,omitempty"`
+	Validators   map[string]Validator     // 验证者列表
 }
 
 // NewStateDB 创建新的状态数据库

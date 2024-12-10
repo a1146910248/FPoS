@@ -13,8 +13,8 @@ import (
 func main() {
 	ctx := context.Background()
 	isBootstrap := os.Getenv("BOOTSTRAP") == "true"
-	enableTx := os.Getenv("ENABLE_TX") == "true"    // 控制是否启用定时交易
-	isSequencer := os.Getenv("SEQUENCER") == "true" // 是否为排序器节点
+	enableTx := os.Getenv("ENABLE_TX") == "true" // 控制是否启用定时交易
+	//isSequencer := os.Getenv("SEQUENCER") == "true" // 是否为排序器节点
 
 	var privKeyBytes []byte
 	// 首先尝试从环境变量获取私钥
@@ -34,7 +34,6 @@ func main() {
 		if err := node.Start(); err != nil {
 			panic(err)
 		}
-
 		// 保存引导节点信息
 		addr := node.GetAddrs()[0]
 		if err := p2p.SaveBootstrapInfo(addr); err != nil {
@@ -54,12 +53,11 @@ func main() {
 			panic(err)
 		}
 		// TODO 如果是排序器节点，之后会加入共识
-		if isSequencer {
-			// 启动排序器节点
-			sequencer := p2p.NewSequencer(node)
-			sequencer.Start()
-			fmt.Println("Sequencer node started")
-		}
+
+		//if isSequencer {
+		// 启动排序器节点
+		sequencer := p2p.NewSequencer(node)
+		//}
 		if err := node.Start(); err != nil {
 			panic(err)
 		}
@@ -68,7 +66,8 @@ func main() {
 			node.StartPeriodicTransaction()
 			fmt.Println("已启动定时交易发送")
 		}
-
+		sequencer.Start()
+		fmt.Println("Sequencer node started")
 		fmt.Printf("Node started with bootstrap: %s\n", bootstrapAddr)
 	}
 	sigChan := make(chan os.Signal, 1)

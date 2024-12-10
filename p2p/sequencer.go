@@ -1,50 +1,61 @@
 package p2p
 
 import (
+	"FPoS/core/consensus"
 	"FPoS/types"
 	"fmt"
 	"sync"
 	"time"
 )
 
-const _MaxBlockGasLimit_ = 21000
+const _MaxBlockGasLimit_ = 2100
 
 type Sequencer struct {
 	node             *Layer2Node
 	blockHeight      uint64
 	mu               sync.Mutex
 	maxBlockGasLimit uint64
+
+	electionMgr *consensus.ElectionManager
 }
 
 func NewSequencer(node *Layer2Node) *Sequencer {
-	node.isSequencer = true
+	//node.isSequencer = true
 	seq := &Sequencer{
 		node:        node,
 		blockHeight: 0,
 		//maxBlockGasLimit: 30_000_000, // 区块 gas 上限为 30,000,000
 		maxBlockGasLimit: _MaxBlockGasLimit_, // 区块 gas 上限为 30,000,000
 	}
-	node.sequencer = seq
+	//node.sequencer = seq
 	return seq
 }
 
 func (s *Sequencer) Start() {
-	go func() {
-		// 等待节点初始化完成
-		for {
-			s.node.mu.RLock()
-			initialized := s.node.initialized
-			s.node.mu.RUnlock()
+	// 监听排序器轮换
+	go s.watchRotation()
 
-			if initialized {
-				break
-			}
-			time.Sleep(100 * time.Millisecond)
+	// 原有的区块生产逻辑
+	go s.blockProducingLoop()
+}
+
+func (s *Sequencer) watchRotation() {
+	rotationCh := s.node.electionMgr.GetRotationChannel()
+	for range rotationCh {
+		s.mu.Lock()
+		// 当前节点被选上
+		if s.node.IsCurrentSequencer() {
+			s.node.isSequencer = true
+			s.node.sequencer = s
+			addr, _ := types.PublicKeyToAddress(s.node.publicKey)
+			fmt.Printf("Node %s became the new sequencer\n", addr)
+		} else {
+			// 没被选上，将排序器清空
+			s.node.isSequencer = false
+			s.node.sequencer = nil
 		}
-
-		fmt.Println("Sequencer starting block production after node initialization")
-		s.blockProducingLoop()
-	}()
+		s.mu.Unlock()
+	}
 }
 
 func (s *Sequencer) blockProducingLoop() {
@@ -56,7 +67,11 @@ func (s *Sequencer) blockProducingLoop() {
 		case <-s.node.ctx.Done():
 			return
 		case <-ticker.C:
-			if s.shouldProduceBlock() {
+			s.mu.Lock()
+			isCurrentSeq := s.node.isSequencer
+			s.mu.Unlock()
+
+			if isCurrentSeq && s.shouldProduceBlock() {
 				s.produceBlock()
 			}
 		}
@@ -104,7 +119,7 @@ func (s *Sequencer) produceBlock() {
 		return
 	}
 
-	proPub, _ := PublicKeyToAddress(s.node.publicKey)
+	proPub, _ := types.PublicKeyToAddress(s.node.publicKey)
 	// 创建新区块
 	block := types.Block{
 		Height:       s.blockHeight + 1,
