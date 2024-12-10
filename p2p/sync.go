@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"FPoS/core/consensus"
 	. "FPoS/types"
 	"encoding/json"
 	"fmt"
@@ -13,7 +14,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 )
 
-const MaxMessageSize = 1024 * 512 // 0.5MB限制
+const MaxMessageSize = 3 * 1024 * 1024 // 0.5MB限制
 
 // 添加消息类型标识
 type MessageType int
@@ -40,31 +41,39 @@ func (n *Layer2Node) setupTopics() error {
 	if err != nil {
 		return err
 	}
-	n.txTopic = txTopic
+	n.topic.txTopic = txTopic
 
 	blockTopic, err := n.pubsub.Join("l2_blocks")
 	if err != nil {
 		return err
 	}
-	n.blockTopic = blockTopic
+	n.topic.blockTopic = blockTopic
 
 	stateTopic, err := n.pubsub.Join("l2_state")
 	if err != nil {
 		return err
 	}
-	n.stateTopic = stateTopic
+	n.topic.stateTopic = stateTopic
+
+	// 添加验证者同步专用 topic
+	validatorTopic, err := n.pubsub.Join("l2_validator_sync") // 修改 topic 名称
+	if err != nil {
+		return fmt.Errorf("failed to join validator topic: %v", err)
+	}
+	n.topic.validatorTopic = validatorTopic
 
 	// 添加交易同步专用 topic
 	txSyncTopic, err := n.pubsub.Join("l2_tx_sync")
 	if err != nil {
 		return err
 	}
-	n.txSyncTopic = txSyncTopic
+	n.topic.txSyncTopic = txSyncTopic
 
 	go n.handleTxMessages()
 	go n.handleBlockMessages()
 	go n.handleStateMessages()
 	go n.handleTxSyncMessages()
+	go n.handleValidatorSyncMessage()
 
 	return nil
 }
@@ -75,7 +84,7 @@ type pendingMessage struct {
 }
 
 func (n *Layer2Node) handleTxMessages() {
-	sub, err := n.txTopic.Subscribe()
+	sub, err := n.topic.txTopic.Subscribe()
 	if err != nil {
 		return
 	}
@@ -159,7 +168,7 @@ func (n *Layer2Node) handleTxMessages() {
 }
 
 func (n *Layer2Node) handleBlockMessages() {
-	sub, err := n.blockTopic.Subscribe()
+	sub, err := n.topic.blockTopic.Subscribe()
 	if err != nil {
 		return
 	}
@@ -186,7 +195,7 @@ func (n *Layer2Node) handleBlockMessages() {
 }
 
 func (n *Layer2Node) handleStateMessages() {
-	sub, err := n.stateTopic.Subscribe()
+	sub, err := n.topic.stateTopic.Subscribe()
 	if err != nil {
 		return
 	}
@@ -236,7 +245,7 @@ func (n *Layer2Node) handleStateMessages() {
 
 // 处理交易同步消息
 func (n *Layer2Node) handleTxSyncMessages() {
-	sub, err := n.txSyncTopic.Subscribe()
+	sub, err := n.topic.txSyncTopic.Subscribe()
 	if err != nil {
 		return
 	}
@@ -244,6 +253,7 @@ func (n *Layer2Node) handleTxSyncMessages() {
 	for {
 		msg, err := sub.Next(n.ctx)
 		if err != nil {
+			fmt.Printf("Error receiving message: %v\n", err)
 			continue
 		}
 
@@ -277,6 +287,33 @@ func (n *Layer2Node) handleTxSyncMessages() {
 			if resp.RequestID == n.currentSyncRequestID {
 				n.handleTxSyncResponse(msg)
 			}
+		}
+	}
+}
+
+func (n *Layer2Node) handleValidatorSyncMessage() {
+	sub, err := n.topic.validatorTopic.Subscribe()
+	if err != nil {
+		return
+	}
+
+	for {
+		msg, err := sub.Next(n.ctx)
+		if err != nil {
+			fmt.Printf("Error receiving message: %v\n", err)
+			continue
+		}
+
+		// 忽略自己发送的消息
+		if msg.ReceivedFrom == n.host.ID() {
+			continue
+		}
+
+		// 添加日志以调试消息接收
+		fmt.Printf("Received validator message from: %s\n", msg.ReceivedFrom)
+
+		if err = n.electionMgr.HandleValidatorMessage(msg.Data); err != nil {
+			fmt.Printf("Failed to handle validator message: %v\n", err)
 		}
 	}
 }
@@ -323,7 +360,7 @@ func (n *Layer2Node) attemptStateSync() error {
 	}
 
 	// 通过状态主题发布同步请求
-	if err = n.stateTopic.Publish(n.ctx, reqData); err != nil {
+	if err = n.topic.stateTopic.Publish(n.ctx, reqData); err != nil {
 		return fmt.Errorf("failed to publish sync request: %w", err)
 	}
 
@@ -337,7 +374,7 @@ func (n *Layer2Node) attemptStateSync() error {
 	requestID := syncReq.RequestID // 保存请求ID
 
 	// 设置一次性的消息处理器来接收响应
-	sub, err := n.stateTopic.Subscribe()
+	sub, err := n.topic.stateTopic.Subscribe()
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to state topic: %w", err)
 	}
@@ -411,7 +448,7 @@ func (n *Layer2Node) attemptStateSync() error {
 	// 等待响应或超时
 	select {
 	case resp := <-responseChan:
-		n.updateLocalState(resp.Accounts, resp.PendingTxs, resp.Blocks, resp.ToHeight)
+		n.updateLocalState(resp.Accounts, resp.PendingTxs, resp.Blocks, resp.ToHeight, resp.Validators)
 		fmt.Printf("---------------------------------------------Successfully synced state from peers---------------------------------------------\n")
 		return nil
 	case <-timeout:
@@ -419,7 +456,7 @@ func (n *Layer2Node) attemptStateSync() error {
 	}
 }
 
-func (n *Layer2Node) updateLocalState(accounts map[string]*AccountState, pendingTxs []Transaction, blocks []Block, newHeight uint64) {
+func (n *Layer2Node) updateLocalState(accounts map[string]*AccountState, pendingTxs []Transaction, blocks []Block, newHeight uint64, validators map[string]consensus.Validator) {
 	n.mu.Lock()
 	n.isSyncing = true
 	wasInitialized := n.initialized
@@ -548,6 +585,18 @@ func (n *Layer2Node) updateLocalState(accounts map[string]*AccountState, pending
 			continue
 		}
 	}
+	// 同步现有的validators
+	n.electionMgr.InitValidators()
+	for addr, validator := range validators {
+		if _, ok := n.electionMgr.Validators[addr]; ok {
+			continue
+		}
+		n.electionMgr.Validators[addr] = &validator
+	}
+	// 如果没有别的候选者应该在初始化后令唯一的候选者为排序器
+	if len(n.electionMgr.Validators) == 1 {
+		n.electionMgr.RotateSequencer()
+	}
 	n.mu.Unlock()
 }
 
@@ -651,6 +700,7 @@ func (n *Layer2Node) handleStateSync(msg *pubsub.Message) {
 		Blocks:       blocks,
 		FromHeight:   syncReq.FromHeight,
 		ToHeight:     n.latestBlock,
+		Validators:   n.electionMgr.GetValidators(),
 	}
 
 	// 序列化完整响应
@@ -687,7 +737,7 @@ func (n *Layer2Node) handleStateSync(msg *pubsub.Message) {
 			continue
 		}
 
-		if err := n.stateTopic.Publish(n.ctx, chunkData); err != nil {
+		if err := n.topic.stateTopic.Publish(n.ctx, chunkData); err != nil {
 			fmt.Printf("Error publishing chunk %d/%d: %s\n", i+1, totalChunks, err)
 			continue
 		}
@@ -695,4 +745,19 @@ func (n *Layer2Node) handleStateSync(msg *pubsub.Message) {
 		fmt.Printf("Sent chunk %d/%d, size: %d bytes\n", i+1, totalChunks, len(chunk.Data))
 		//time.Sleep(200 * time.Millisecond)
 	}
+}
+
+// 广播验证者加入
+func (n *Layer2Node) BroadcastValidatorJoin(validator consensus.Validator, msgType consensus.ValidatorMessageType) error {
+	msg := consensus.ValidatorMessage{
+		Type:      msgType,
+		Validator: validator,
+		Signature: nil,
+	}
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	err = n.topic.validatorTopic.Publish(n.ctx, data)
+	return err
 }

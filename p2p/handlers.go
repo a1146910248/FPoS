@@ -301,7 +301,7 @@ func (n *Layer2Node) syncMissingTransactions(address string, fromNonce, toNonce 
 	}
 
 	// 发布同步请求
-	if err := n.txSyncTopic.Publish(n.ctx, data); err != nil {
+	if err := n.topic.txSyncTopic.Publish(n.ctx, data); err != nil {
 		return fmt.Errorf("failed to publish tx sync request: %w", err)
 	}
 
@@ -348,7 +348,7 @@ func (n *Layer2Node) handleTxSyncRequest(msg *pubsub.Message) {
 		return
 	}
 
-	n.txSyncTopic.Publish(n.ctx, data)
+	n.topic.txSyncTopic.Publish(n.ctx, data)
 }
 
 // 处理交易同步响应

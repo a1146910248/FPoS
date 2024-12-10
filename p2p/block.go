@@ -33,6 +33,10 @@ func (n *Layer2Node) processNewBlock(block Block, isHistoricalBlock bool) error 
 	n.stateRoot = block.StateRoot
 	n.blockCache.Store(block.Height, block)
 
+	// 通知选举管理器新区块生成
+	if n.electionMgr != nil {
+		n.electionMgr.OnBlockProduced(block.Height)
+	}
 	return nil
 }
 
@@ -43,7 +47,7 @@ func (n *Layer2Node) BroadcastTransaction(tx Transaction) error {
 		return err
 	}
 
-	return n.txTopic.Publish(n.ctx, data)
+	return n.topic.txTopic.Publish(n.ctx, data)
 }
 
 // 广播区块
@@ -53,7 +57,7 @@ func (n *Layer2Node) BroadcastBlock(block Block) error {
 		return err
 	}
 
-	return n.blockTopic.Publish(n.ctx, data)
+	return n.topic.blockTopic.Publish(n.ctx, data)
 }
 
 // 请求状态同步

@@ -1,17 +1,19 @@
 package p2p
 
 import (
+	"FPoS/core/consensus"
 	"FPoS/types"
 	"context"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/libp2p/go-libp2p"
+	"github.com/multiformats/go-multiaddr"
 	"os"
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -21,18 +23,14 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
-	"github.com/multiformats/go-multiaddr"
 )
 
 type Layer2Node struct {
 	host                 host.Host
 	dht                  *dht.IpfsDHT
 	pubsub               *pubsub.PubSub
-	txTopic              *pubsub.Topic
-	blockTopic           *pubsub.Topic
-	stateTopic           *pubsub.Topic
-	txSyncTopic          *pubsub.Topic
 	ctx                  context.Context
+	topic                P2PTopic
 	blockCache           *sync.Map
 	txPool               *sync.Map
 	stateRoot            string
@@ -50,8 +48,19 @@ type Layer2Node struct {
 	isSyncing            bool
 	initialized          bool
 	stateDB              *StateDB
+	electionMgr          *consensus.ElectionManager
 	periodicTxStarted    bool
 }
+
+type P2PTopic struct {
+	txTopic        *pubsub.Topic
+	blockTopic     *pubsub.Topic
+	stateTopic     *pubsub.Topic
+	txSyncTopic    *pubsub.Topic
+	validatorTopic *pubsub.Topic
+}
+
+const pubsubMaxSize = 1 << 22 // 4 MB
 
 func NewLayer2Node(ctx context.Context, port int, bootstrapPeers []string, privKeyBytes []byte) (*Layer2Node, error) {
 	var privateKey crypto.PrivKey
@@ -91,6 +100,7 @@ func NewLayer2Node(ctx context.Context, port int, bootstrapPeers []string, privK
 	ps, err := pubsub.NewGossipSub(ctx, host,
 		pubsub.WithPeerExchange(true),             // 启用节点交换
 		pubsub.WithDirectPeers([]peer.AddrInfo{}), // 允许直接连接
+		pubsub.WithMaxMessageSize(pubsubMaxSize),
 	)
 	if err != nil {
 		return nil, err
@@ -127,11 +137,18 @@ func NewLayer2Node(ctx context.Context, port int, bootstrapPeers []string, privK
 		return nil, err
 	}
 
+	// 初始化排序器管理器
+	consensusConfig := &consensus.ConsensusConfig{
+		MinStakeAmount:   1000000,
+		RotationInterval: 15 * time.Second,
+		ValidatorQuorum:  3,
+	}
+	node.electionMgr = consensus.NewElectionManager(node.ctx, consensusConfig)
 	return node, nil
 }
 func initState(node *Layer2Node, bootstrapPeers []string) error {
 	// 为启动节点设置初始状态
-	pub, err := PublicKeyToAddress(node.publicKey)
+	pub, err := types.PublicKeyToAddress(node.publicKey)
 	if err != nil {
 		return fmt.Errorf("私钥处理失败: %w", err)
 	}
@@ -206,7 +223,7 @@ func (n *Layer2Node) handleNewPeer(p peer.ID) {
 	pubKey := n.host.Peerstore().PubKey(p)
 
 	// 生成节点地址
-	peerAddress, err := PublicKeyToAddress(pubKey)
+	peerAddress, err := types.PublicKeyToAddress(pubKey)
 	if err != nil {
 		fmt.Printf("Failed to generate address for peer %s: %s\n", p.String(), err)
 		return
@@ -232,6 +249,32 @@ func (n *Layer2Node) GetAddrs() []string {
 		addrs = append(addrs, fmt.Sprintf("%s/p2p/%s", addr, n.host.ID()))
 	}
 	return addrs
+}
+
+func (n *Layer2Node) InitConsensus(config *consensus.ConsensusConfig) error {
+	// 加入验证者网络
+	validator, err := n.electionMgr.RegisterValidator(
+		n.publicKey,
+		config.MinStakeAmount,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to join as validator: %w", err)
+	}
+	// 广播加入
+	err = n.BroadcastValidatorJoin(*validator, consensus.ValidatorJoin)
+	if err != nil {
+		return err
+	}
+	// 开始管理器循环
+	n.electionMgr.Start()
+	return nil
+}
+
+func (n *Layer2Node) IsCurrentSequencer() bool {
+	if n.electionMgr == nil {
+		return false
+	}
+	return n.electionMgr.IsCurrentSequencer(n.publicKey)
 }
 
 func (n *Layer2Node) Start() error {
@@ -271,6 +314,19 @@ func (n *Layer2Node) Start() error {
 	}
 	// 寻找网络中的其他节点
 	go n.discoverPeers()
+
+	// 如果是验证者节点，初始化共识
+	if len(n.bootstrapPeers) > 0 {
+		consensusConfig := &consensus.ConsensusConfig{
+			MinStakeAmount:   1000000,
+			RotationInterval: 15 * time.Second,
+			ValidatorQuorum:  3,
+		}
+		time.Sleep(1 * time.Second)
+		if err := n.InitConsensus(consensusConfig); err != nil {
+			panic(err)
+		}
+	}
 	// 同步其他的节点世界状态
 	if len(n.bootstrapPeers) > 0 {
 		if err := n.syncStateFromPeers(); err != nil {

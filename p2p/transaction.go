@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/libp2p/go-libp2p/core/crypto"
 	"golang.org/x/crypto/sha3"
 	"math/rand"
 	"time"
@@ -22,11 +21,11 @@ func (n *Layer2Node) StartPeriodicTransaction() {
 	n.mu.Unlock()
 
 	go func() {
-		ticker := time.NewTicker(50 * time.Millisecond)
+		ticker := time.NewTicker(1000 * time.Millisecond)
 		defer ticker.Stop()
 
 		// 获取本节点的地址
-		fromAddress, err := PublicKeyToAddress(n.privateKey.GetPublic())
+		fromAddress, err := types.PublicKeyToAddress(n.privateKey.GetPublic())
 		if err != nil {
 			fmt.Printf("生成发送方地址失败: %v\n", err)
 			return
@@ -157,7 +156,7 @@ func VerifyTransactionSignature(tx *types.Transaction, n *Layer2Node) error {
 	}
 
 	// 首先检查是否是本节点的地址
-	if addr, err := PublicKeyToAddress(n.publicKey); err == nil && addr == fromAddr {
+	if addr, err := types.PublicKeyToAddress(n.publicKey); err == nil && addr == fromAddr {
 		valid, err := n.publicKey.Verify(message, tx.Signature)
 		if err != nil {
 			return fmt.Errorf("signature verification error: %w", err)
@@ -259,25 +258,6 @@ func CalculateTxHash(tx *types.Transaction) (bool, error) {
 	return "0x"+hex.EncodeToString(hash.Sum(nil)) == tx.Hash, nil
 }
 
-// 从公钥生成地址
-func PublicKeyToAddress(pub crypto.PubKey) (string, error) {
-	// 获取公钥的原始字节
-	pubBytes, err := pub.Raw()
-	if err != nil {
-		return "", err
-	}
-
-	// 使用 Keccak-256 哈希公钥
-	hash := sha3.NewLegacyKeccak256()
-	hash.Write(pubBytes)
-
-	// 取最后20字节作为地址（类似以太坊）
-	address := hash.Sum(nil)[12:]
-
-	// 返回带0x前缀的地址
-	return "0x" + hex.EncodeToString(address), nil
-}
-
 func (n *Layer2Node) getRandomToPubKey() (string, error) {
 	n.stateDB.mu.RLock()
 	defer n.stateDB.mu.RUnlock()
@@ -286,7 +266,7 @@ func (n *Layer2Node) getRandomToPubKey() (string, error) {
 	addresses := make([]string, 0)
 	for addr := range n.stateDB.accounts {
 		// 排除自己的地址
-		if pb, _ := PublicKeyToAddress(n.publicKey); addr != pb {
+		if pb, _ := types.PublicKeyToAddress(n.publicKey); addr != pb {
 			addresses = append(addresses, addr)
 		}
 	}
