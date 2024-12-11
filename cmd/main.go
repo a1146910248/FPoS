@@ -1,6 +1,8 @@
 package main
 
 import (
+	"FPoS/config"
+	"FPoS/core/ethereum"
 	"FPoS/p2p"
 	"FPoS/types"
 	"context"
@@ -14,7 +16,6 @@ func main() {
 	ctx := context.Background()
 	isBootstrap := os.Getenv("BOOTSTRAP") == "true"
 	enableTx := os.Getenv("ENABLE_TX") == "true" // 控制是否启用定时交易
-	//isSequencer := os.Getenv("SEQUENCER") == "true" // 是否为排序器节点
 
 	var privKeyBytes []byte
 	// 首先尝试从环境变量获取私钥
@@ -23,6 +24,19 @@ func main() {
 	}
 	if privKeyBytes != nil {
 		fmt.Println(privKeyBytes)
+	}
+
+	// 加载配置
+	config, err := config.LoadConfig("config/config.yaml")
+	if err != nil {
+		fmt.Printf("Warning: Failed to load config: %v\n", err)
+		// 使用默认配置继续运行
+		config.Ethereum = &ethereum.EthereumConfig{
+			RPCURL:        "http://localhost:8545",
+			GasLimit:      3000000,
+			GasPrice:      20000000000,
+			ConfirmBlocks: 2,
+		}
 	}
 
 	if isBootstrap {
@@ -52,11 +66,10 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		// TODO 如果是排序器节点，之后会加入共识
 
 		//if isSequencer {
 		// 启动排序器节点
-		sequencer := p2p.NewSequencer(node)
+		sequencer, _ := p2p.NewSequencer(node, config)
 		//}
 		if err := node.Start(); err != nil {
 			panic(err)

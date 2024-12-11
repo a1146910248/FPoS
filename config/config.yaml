@@ -1,0 +1,7 @@
+ethereum:
+  rpc_url: "http://localhost:8545"  # 以太坊RPC地址
+  contract_address: "ca56e18ef7589dce593b5cf99d5f63c97a94f644"         # L2合约地址
+  private_key: "143e2c1d5dc092e12b2528c7d9c8375dd695e516e25063284a3a07f69f78fa6c"             # 用于提交区块的私钥
+  gas_limit: 3000000               # gas限制
+  gas_price: 20000000000           # gas价格 (20 Gwei)
+  confirm_blocks: 2                 # 交易确认所需区块数

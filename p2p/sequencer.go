@@ -1,7 +1,9 @@
 package p2p
 
 import (
+	"FPoS/config"
 	"FPoS/core/consensus"
+	"FPoS/core/ethereum"
 	"FPoS/types"
 	"fmt"
 	"sync"
@@ -17,18 +19,25 @@ type Sequencer struct {
 	maxBlockGasLimit uint64
 
 	electionMgr *consensus.ElectionManager
+	ethClient   *ethereum.EthereumClient
 }
 
-func NewSequencer(node *Layer2Node) *Sequencer {
+func NewSequencer(node *Layer2Node, config *config.Config) (*Sequencer, error) {
+	ethClient, err := ethereum.NewEthereumClient(config.Ethereum)
+	if err != nil {
+		fmt.Printf("connect ethereum failed:" + err.Error())
+		return nil, err
+	}
 	//node.isSequencer = true
 	seq := &Sequencer{
 		node:        node,
 		blockHeight: 0,
 		//maxBlockGasLimit: 30_000_000, // 区块 gas 上限为 30,000,000
 		maxBlockGasLimit: _MaxBlockGasLimit_, // 区块 gas 上限为 30,000,000
+		ethClient:        ethClient,
 	}
 	//node.sequencer = seq
-	return seq
+	return seq, nil
 }
 
 func (s *Sequencer) Start() {
@@ -159,6 +168,12 @@ func (s *Sequencer) produceBlock() {
 	if err := s.node.BroadcastBlock(block); err != nil {
 		fmt.Printf("Failed to broadcast block: %v\n", err)
 		return
+	}
+
+	// 提交区块到L1
+	if err := s.ethClient.SubmitBlock(&block); err != nil {
+		fmt.Printf("Failed to submit block to L1: %v\n", err)
+		// 不要因为L1提交失败而影响L2的共识
 	}
 
 	// 更新状态
