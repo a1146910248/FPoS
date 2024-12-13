@@ -5,6 +5,7 @@ import (
 	. "FPoS/types"
 	"encoding/json"
 	"fmt"
+	"github.com/libp2p/go-libp2p/core/crypto"
 	"os"
 	"sort"
 	"sync"
@@ -190,6 +191,8 @@ func (n *Layer2Node) handleBlockMessages() {
 				}
 				fmt.Printf("接收到新区块！\nblockHash：%s\nPrevBlockHash:%s\nBlockHeight:%d\nSig:%x\nProposor:%s\n\n", block.Hash, block.PreviousHash, block.Height, block.Signature, block.Proposer)
 			}
+		} else {
+			fmt.Printf("process block Unmashal fail!")
 		}
 	}
 }
@@ -448,7 +451,7 @@ func (n *Layer2Node) attemptStateSync() error {
 	// 等待响应或超时
 	select {
 	case resp := <-responseChan:
-		n.updateLocalState(resp.Accounts, resp.PendingTxs, resp.Blocks, resp.ToHeight, resp.Validators)
+		n.updateLocalState(resp.Accounts, resp.PendingTxs, resp.Blocks, resp.ToHeight, resp.Validators, resp.SelectState)
 		fmt.Printf("---------------------------------------------Successfully synced state from peers---------------------------------------------\n")
 		return nil
 	case <-timeout:
@@ -456,7 +459,8 @@ func (n *Layer2Node) attemptStateSync() error {
 	}
 }
 
-func (n *Layer2Node) updateLocalState(accounts map[string]*AccountState, pendingTxs []Transaction, blocks []Block, newHeight uint64, validators map[string]consensus.Validator) {
+func (n *Layer2Node) updateLocalState(accounts map[string]*AccountState, pendingTxs []Transaction, blocks []Block,
+	newHeight uint64, validators map[string]consensus.Validator, selectState consensus.ElectionState) {
 	n.mu.Lock()
 	n.isSyncing = true
 	wasInitialized := n.initialized
@@ -585,6 +589,9 @@ func (n *Layer2Node) updateLocalState(accounts map[string]*AccountState, pending
 			continue
 		}
 	}
+
+	// 同步选举器的state
+	n.electionMgr.SetState(&selectState)
 	// 同步现有的validators
 	n.electionMgr.InitValidators()
 	for addr, validator := range validators {
@@ -593,10 +600,10 @@ func (n *Layer2Node) updateLocalState(accounts map[string]*AccountState, pending
 		}
 		n.electionMgr.Validators[addr] = &validator
 	}
-	// 如果没有别的候选者应该在初始化后令唯一的候选者为排序器
-	if len(n.electionMgr.Validators) == 1 {
-		n.electionMgr.RotateSequencer()
-	}
+	//// 如果没有别的候选者应该在初始化后令唯一的候选者为排序器
+	//if len(n.electionMgr.Validators) == 1 {
+	//	n.electionMgr.RotateSequencer()
+	//}
 	n.mu.Unlock()
 }
 
@@ -701,6 +708,7 @@ func (n *Layer2Node) handleStateSync(msg *pubsub.Message) {
 		FromHeight:   syncReq.FromHeight,
 		ToHeight:     n.latestBlock,
 		Validators:   n.electionMgr.GetValidators(),
+		SelectState:  n.electionMgr.GetState(),
 	}
 
 	// 序列化完整响应
@@ -749,6 +757,14 @@ func (n *Layer2Node) handleStateSync(msg *pubsub.Message) {
 
 // 广播验证者加入
 func (n *Layer2Node) BroadcastValidatorJoin(validator consensus.Validator, msgType consensus.ValidatorMessageType) error {
+	// 确保在广播前设置 PublicKeyBytes
+	if validator.PublicKey != nil {
+		pubKeyBytes, err := crypto.MarshalPublicKey(validator.PublicKey)
+		if err != nil {
+			return fmt.Errorf("failed to get public key bytes: %v", err)
+		}
+		validator.PublicKeyBytes = pubKeyBytes
+	}
 	msg := consensus.ValidatorMessage{
 		Type:      msgType,
 		Validator: validator,

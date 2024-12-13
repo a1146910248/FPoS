@@ -33,6 +33,10 @@ func (n *Layer2Node) processNewBlock(block Block, isHistoricalBlock bool) error 
 	n.stateRoot = block.StateRoot
 	n.blockCache.Store(block.Height, block)
 
+	if n.sequencer != nil {
+		n.sequencer.blockHeight++
+	}
+
 	// 通知选举管理器新区块生成
 	if n.electionMgr != nil {
 		n.electionMgr.OnBlockProduced(block.Height)

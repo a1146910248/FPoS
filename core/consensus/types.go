@@ -1,7 +1,10 @@
 package consensus
 
 import (
-	"crypto"
+	"encoding/json"
+	"fmt"
+	"github.com/libp2p/go-libp2p/core/crypto"
+	"math/big"
 	"time"
 )
 
@@ -22,14 +25,16 @@ const (
 
 // Validator 验证者信息
 type Validator struct {
-	Address        string           // 验证者地址
-	PublicKey      crypto.PublicKey // 公钥
-	Status         ValidatorStatus  // 状态
-	StakeAmount    uint64           // 质押金额
-	JoinTime       time.Time        // 加入时间
-	BlocksProduced uint64
-	LastBlockTime  time.Time
-	MissedBlocks   int // 错过的区块数
+	Address        string          `json:"address"`
+	PublicKey      crypto.PubKey   `json:"-"`          // 不直接序列化
+	PublicKeyBytes []byte          `json:"public_key"` // 用于序列化的字段
+	Status         ValidatorStatus `json:"status"`
+	StakeAmount    uint64          `json:"stake_amount"`
+	JoinTime       time.Time       `json:"join_time"`
+	BlocksProduced uint64          `json:"blocks_produced"`
+	LastBlockTime  time.Time       `json:"last_block_time"`
+	MissedBlocks   int             `json:"missed_blocks"`
+	WeightScore    uint64          `json:"weight_score"`
 }
 
 // ConsensusConfig 共识配置
@@ -48,6 +53,8 @@ type ElectionState struct {
 	RotationInterval time.Duration         // 轮换间隔
 	BlockTimeout     time.Duration         // 区块生成超时时间
 	MaxMissedBlocks  int                   // 允许的最大错过区块数
+	LastRandomNumber *big.Int              // 上一次使用的随机数
+	NextRotationTime time.Time             `json:"next_rotation_time"` // 新增：下次轮换时间
 }
 
 // ValidatorMessage 验证者消息类型
@@ -64,4 +71,55 @@ type ValidatorMessage struct {
 	Type      ValidatorMessageType `json:"type"`
 	Validator Validator            `json:"validator"`
 	Signature []byte               `json:"signature"`
+}
+
+// MarshalJSON 自定义JSON序列化方法
+func (v *Validator) MarshalJSON() ([]byte, error) {
+	type ValidatorAlias Validator
+
+	// 获取公钥字节
+	var pubKeyBytes []byte
+	if v.PublicKey != nil {
+		// 使用 libp2p 的 MarshalPublicKey 方法
+		var err error
+		pubKeyBytes, err = crypto.MarshalPublicKey(v.PublicKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal public key: %v", err)
+		}
+	}
+
+	return json.Marshal(&struct {
+		*ValidatorAlias
+		PublicKeyBytes []byte `json:"public_key"`
+	}{
+		ValidatorAlias: (*ValidatorAlias)(v),
+		PublicKeyBytes: pubKeyBytes,
+	})
+}
+
+// UnmarshalJSON 自定义JSON反序列化方法
+func (v *Validator) UnmarshalJSON(data []byte) error {
+	type ValidatorAlias Validator
+	aux := &struct {
+		*ValidatorAlias
+		PublicKeyBytes []byte `json:"public_key"`
+	}{
+		ValidatorAlias: (*ValidatorAlias)(v),
+	}
+
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+
+	// 从字节恢复公钥
+	if len(aux.PublicKeyBytes) > 0 {
+		pubKey, err := crypto.UnmarshalPublicKey(aux.PublicKeyBytes)
+		if err != nil {
+			return fmt.Errorf("failed to unmarshal public key: %v", err)
+		}
+		v.PublicKey = pubKey
+		v.PublicKeyBytes = aux.PublicKeyBytes // 保存原始字节
+	}
+
+	return nil
 }

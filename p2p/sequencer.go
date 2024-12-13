@@ -28,6 +28,7 @@ func NewSequencer(node *Layer2Node, config *config.Config) (*Sequencer, error) {
 		fmt.Printf("connect ethereum failed:" + err.Error())
 		return nil, err
 	}
+	node.electionMgr.SetEth(ethClient)
 	//node.isSequencer = true
 	seq := &Sequencer{
 		node:        node,
@@ -36,7 +37,7 @@ func NewSequencer(node *Layer2Node, config *config.Config) (*Sequencer, error) {
 		maxBlockGasLimit: _MaxBlockGasLimit_, // 区块 gas 上限为 30,000,000
 		ethClient:        ethClient,
 	}
-	//node.sequencer = seq
+	node.sequencer = seq
 	return seq, nil
 }
 
@@ -61,7 +62,6 @@ func (s *Sequencer) watchRotation() {
 		} else {
 			// 没被选上，将排序器清空
 			s.node.isSequencer = false
-			s.node.sequencer = nil
 		}
 		s.mu.Unlock()
 	}
@@ -81,6 +81,10 @@ func (s *Sequencer) blockProducingLoop() {
 			s.mu.Unlock()
 
 			if isCurrentSeq && s.shouldProduceBlock() {
+				// 一旦当选应该立即置否以防止连续出块
+				s.mu.Lock()
+				s.node.isSequencer = false
+				s.mu.Unlock()
 				s.produceBlock()
 			}
 		}
@@ -131,7 +135,7 @@ func (s *Sequencer) produceBlock() {
 	proPub, _ := types.PublicKeyToAddress(s.node.publicKey)
 	// 创建新区块
 	block := types.Block{
-		Height:       s.blockHeight + 1,
+		Height:       s.node.latestBlock + 1,
 		Timestamp:    time.Now(),
 		Transactions: transactions,
 		StateRoot:    s.node.stateDB.GetStateRoot(),
@@ -164,20 +168,20 @@ func (s *Sequencer) produceBlock() {
 	}
 	block.Hash = blockHash
 
+	// 提交区块到L1
+	go func() {
+		if err := s.ethClient.SubmitBlock(&block); err != nil {
+			fmt.Printf("Failed to submit block to L1: %v\n", err)
+			// 不要因为L1提交失败而影响L2的共识
+		}
+	}()
+
 	// 广播区块
 	if err := s.node.BroadcastBlock(block); err != nil {
 		fmt.Printf("Failed to broadcast block: %v\n", err)
 		return
 	}
 
-	// 提交区块到L1
-	if err := s.ethClient.SubmitBlock(&block); err != nil {
-		fmt.Printf("Failed to submit block to L1: %v\n", err)
-		// 不要因为L1提交失败而影响L2的共识
-	}
-
-	// 更新状态
-	s.blockHeight++
 	fmt.Printf("New block produced: height=%d, txs=%d, gasUsed=%d\n",
 		block.Height, len(block.Transactions), totalGas)
 }

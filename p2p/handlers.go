@@ -150,7 +150,7 @@ func (n *Layer2Node) defaultBlockValidation(block Block, isHistoricalBlock bool)
 
 	// 验证每笔交易，是否是同步分开
 	for _, tx := range block.Transactions {
-		if !n.validateTxForBlock(&tx, isHistoricalBlock) {
+		if !n.validateTxForBlock(&tx, isHistoricalBlock, block.Proposer) {
 			return false
 		}
 	}
@@ -166,14 +166,15 @@ func (n *Layer2Node) defaultBlockValidation(block Block, isHistoricalBlock bool)
 }
 
 // 验证区块中的每条交易，需要在交易池中存在，与同步交易刚好相反
-func (n *Layer2Node) validateTxForBlock(tx *Transaction, isHistoricalBlock bool) bool {
+func (n *Layer2Node) validateTxForBlock(tx *Transaction, isHistoricalBlock bool, sequencerAddr string) bool {
 	if isRight, err := CalculateTxHash(tx); !isRight || err != nil {
 		fmt.Println("交易哈希错误")
 		return false
 	}
 	// 只有当不是历史区块时才检查交易池
+	myAddress, _ := PublicKeyToAddress(n.publicKey)
 	if !isHistoricalBlock {
-		if n.isSequencer {
+		if sequencerAddr == myAddress {
 			if _, exists := n.txPool.Load(tx.Hash); exists {
 				return false
 			}
@@ -250,7 +251,7 @@ func (n *Layer2Node) validateBlockInternal(block Block, isHistoricalBlock bool) 
 
 	// 验证每笔交易，是否是同步分开
 	for _, tx := range block.Transactions {
-		if !n.validateTxForBlock(&tx, isHistoricalBlock) {
+		if !n.validateTxForBlock(&tx, isHistoricalBlock, block.Proposer) {
 			return false
 		}
 	}
