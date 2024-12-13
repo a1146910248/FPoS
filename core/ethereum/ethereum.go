@@ -11,6 +11,7 @@ import (
 	etype "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/event"
 	"math/big"
 	"time"
 )
@@ -114,6 +115,48 @@ func (ec *EthereumClient) SubmitBlock(block *types.Block) error {
 	}
 
 	return nil
+}
+
+// GetRandomNumber 从L1合约获取随机数，并将其映射到uint64范围内
+func (ec *EthereumClient) GetRandomNumber() (uint64, error) {
+	// 调用合约的 getRandomNumber 方法
+	randomBig, err := ec.contract.GetRandomNumber(&bind.CallOpts{})
+	if err != nil {
+		return 0, fmt.Errorf("failed to get random number from contract: %v", err)
+	}
+
+	// 将大数映射到uint64范围内
+	// 使用取模运算将大数映射到uint64的范围
+	maxUint64 := new(big.Int).SetUint64(^uint64(0))
+	mappedNumber := new(big.Int).Mod(randomBig, maxUint64)
+
+	return mappedNumber.Uint64(), nil
+}
+
+// GetFullRandomNumber 获取完整的随机数（big.Int）
+func (ec *EthereumClient) GetFullRandomNumber() (*big.Int, error) {
+	return ec.contract.GetRandomNumber(&bind.CallOpts{})
+}
+
+// WatchRandomNumberUpdated 监听随机数更新事件
+func (ec *EthereumClient) WatchRandomNumberUpdated(sink chan<- *EthereumRandomNumberUpdated) (event.Subscription, error) {
+	return ec.contract.WatchRandomNumberUpdated(&bind.WatchOpts{}, sink)
+}
+
+// FilterRandomNumberUpdated 过滤随机数更新事件
+func (ec *EthereumClient) FilterRandomNumberUpdated(opts *bind.FilterOpts) ([]*EthereumRandomNumberUpdated, error) {
+	iterator, err := ec.contract.FilterRandomNumberUpdated(opts)
+	if err != nil {
+		return nil, err
+	}
+	defer iterator.Close()
+
+	var events []*EthereumRandomNumberUpdated
+	for iterator.Next() {
+		events = append(events, iterator.Event)
+	}
+
+	return events, iterator.Error()
 }
 
 // waitForTransaction 等待交易确认

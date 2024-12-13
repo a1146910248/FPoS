@@ -1,7 +1,9 @@
 package p2p
 
 import (
+	"FPoS/config"
 	"FPoS/core/consensus"
+	"FPoS/core/ethereum"
 	"FPoS/types"
 	"context"
 	"crypto/rand"
@@ -140,7 +142,7 @@ func NewLayer2Node(ctx context.Context, port int, bootstrapPeers []string, privK
 	// 初始化排序器管理器
 	consensusConfig := &consensus.ConsensusConfig{
 		MinStakeAmount:   1000000,
-		RotationInterval: 15 * time.Second,
+		RotationInterval: 60 * time.Second,
 		ValidatorQuorum:  3,
 	}
 	node.electionMgr = consensus.NewElectionManager(node.ctx, consensusConfig)
@@ -283,6 +285,13 @@ func (n *Layer2Node) Start() error {
 		return fmt.Errorf("DHT bootstrap failed: %w", err)
 	}
 
+	// 当为启动节点时也需要开启循环
+	if len(n.bootstrapPeers) == 0 {
+		err := n.bootstrapStart()
+		if err != nil {
+			return err
+		}
+	}
 	// 连接到引导节点
 	if len(n.bootstrapPeers) > 0 {
 		// 先等待同步
@@ -319,10 +328,10 @@ func (n *Layer2Node) Start() error {
 	if len(n.bootstrapPeers) > 0 {
 		consensusConfig := &consensus.ConsensusConfig{
 			MinStakeAmount:   1000000,
-			RotationInterval: 15 * time.Second,
+			RotationInterval: 60 * time.Second,
 			ValidatorQuorum:  3,
 		}
-		time.Sleep(1 * time.Second)
+		time.Sleep(2 * time.Second)
 		if err := n.InitConsensus(consensusConfig); err != nil {
 			panic(err)
 		}
@@ -333,6 +342,29 @@ func (n *Layer2Node) Start() error {
 			fmt.Printf("Failed to sync state from peers: %s\n", err)
 		}
 	}
+	return nil
+}
+
+func (n *Layer2Node) bootstrapStart() error {
+	// 加载配置
+	config, err := config.LoadConfig("config/config.yaml")
+	if err != nil {
+		fmt.Printf("Warning: Failed to load config: %v\n", err)
+		// 使用默认配置继续运行
+		config.Ethereum = &ethereum.EthereumConfig{
+			RPCURL:        "http://localhost:8545",
+			GasLimit:      3000000,
+			GasPrice:      20000000000,
+			ConfirmBlocks: 2,
+		}
+	}
+	ethClient, err := ethereum.NewEthereumClient(config.Ethereum)
+	if err != nil {
+		fmt.Printf("connect ethereum failed:" + err.Error())
+		return err
+	}
+	n.electionMgr.SetEth(ethClient)
+	n.electionMgr.Start()
 	return nil
 }
 

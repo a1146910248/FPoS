@@ -45,6 +45,7 @@ type StateSync struct {
 	PendingTxs   []types.Transaction      `json:"pendingTxs,omitempty"`
 	Blocks       []types.Block            `json:"blocks,omitempty"`
 	Validators   map[string]Validator     // 验证者列表
+	SelectState  ElectionState            // 选举管理器的状态
 }
 
 // NewStateDB 创建新的状态数据库
