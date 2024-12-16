@@ -6,9 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	ethCrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/libp2p/go-libp2p/core/crypto"
-	"math/big"
 	"sync"
 	"time"
 )
@@ -37,6 +35,7 @@ func NewElectionManager(ctx context.Context, config *ConsensusConfig) *ElectionM
 		state: &ElectionState{
 			Validators:       make(map[string]*Validator),
 			RotationInterval: config.RotationInterval,
+			NextRotationTime: time.Now().Add(config.RotationInterval),
 		},
 		config:     config,
 		blockCh:    make(chan uint64, 1),
@@ -98,150 +97,150 @@ func (em *ElectionManager) rotationLoop() {
 	}
 }
 
-func (em *ElectionManager) RotateSequencer() {
-	em.mu.Lock()
-	defer em.mu.Unlock()
-
-	activeValidators := em.getActiveValidators()
-	if len(activeValidators) == 0 {
-		return
-	}
-
-	// 获取L1链上的随机数
-	fullRandom, err := em.ethClient.GetFullRandomNumber()
-	if err != nil {
-		fmt.Printf("Failed to get random number from L1: %v\n", err)
-		return
-	}
-
-	// 计算每个验证者的综合权重
-	type validatorWeight struct {
-		validator *Validator
-		weight    *big.Int
-	}
-
-	weights := make([]validatorWeight, len(activeValidators))
-	totalWeight := new(big.Int)
-
-	for i, v := range activeValidators {
-		// 1. 基础权重 = 质押金额
-		baseWeight := new(big.Int).SetUint64(v.StakeAmount)
-
-		// 2. 计算公钥派生的权重因子
-		pubKeyBytes, err := v.PublicKey.Raw()
-		if err != nil {
-			continue
-		}
-		pubKeyHash := ethCrypto.Keccak256(pubKeyBytes)
-		pubKeyFactor := new(big.Int).SetBytes(pubKeyHash)
-
-		// 3. 累积权重分数
-		accumWeight := new(big.Int).SetUint64(v.WeightScore)
-		// 将累积权重转换为1.0到2.0之间的乘数
-		// weightMultiplier = 1.0 + (accumWeight / 1000)
-		weightMultiplier := new(big.Int).Add(
-			big.NewInt(10), // 基础值1000
-			accumWeight,    // 累积权重
-		)
-		// 4. 使用随机数和公钥计算动态系数
-		dynamicFactor := new(big.Int).Xor(fullRandom, pubKeyFactor)
-
-		// 5. 综合权重计算
-		// weight = baseWeight * weightMultiplier * dynamicFactor / 1000
-		weight := new(big.Int).Mul(baseWeight, weightMultiplier) // 应用累积权重
-		weight.Mul(weight, dynamicFactor)                        // 应用动态因子
-		weight.Div(weight, big.NewInt(1000))                     // 归一化累积权重
-
-		weights[i] = validatorWeight{
-			validator: v,
-			weight:    weight,
-		}
-		totalWeight.Add(totalWeight, weight)
-
-		fmt.Printf("Validator weight calculation: %s\n"+
-			"  Base Weight: %d\n"+
-			"  Accum Score: %d\n"+
-			"  Final Weight: %s\n",
-			v.Address,
-			v.StakeAmount,
-			v.WeightScore,
-			weight.String(),
-		)
-	}
-
-	// 使用随机数选择验证者
-	selection := new(big.Int).Mod(fullRandom, totalWeight)
-	var selectedValidator *Validator
-	accum := new(big.Int)
-
-	for _, vw := range weights {
-		accum.Add(accum, vw.weight)
-		if selection.Cmp(accum) < 0 {
-			selectedValidator = vw.validator
-			break
-		}
-	}
-
-	if selectedValidator == nil {
-		selectedValidator = activeValidators[0]
-	}
-
-	// 更新权重分数
-	for _, v := range activeValidators {
-		if v.Address == selectedValidator.Address {
-			// 被选中的验证者重置权重分数
-			v.WeightScore = 0
-		} else {
-			// 未被选中的验证者增加权重分数
-			v.WeightScore += 100 // 每轮增加100点权重
-		}
-	}
-
-	// 确保不会连续选择同一个排序器
-	if selectedValidator.Address == em.state.CurrentSequencer && len(activeValidators) > 1 {
-		// 使用不同的随机数部分重新选择
-		altRandom := new(big.Int).Rsh(fullRandom, 128)
-		nextBestWeight := new(big.Int).SetInt64(0)
-		var nextBestValidator *Validator
-
-		for _, vw := range weights {
-			if vw.validator.Address != em.state.CurrentSequencer {
-				weightWithAlt := new(big.Int).Xor(vw.weight, altRandom)
-				if nextBestValidator == nil || weightWithAlt.Cmp(nextBestWeight) > 0 {
-					nextBestValidator = vw.validator
-					nextBestWeight = weightWithAlt
-				}
-			}
-		}
-		selectedValidator = nextBestValidator
-	}
-
-	// 更新状态
-	now := time.Now()
-	em.state.CurrentSequencer = selectedValidator.Address
-	em.state.CurrentTerm++
-	em.state.LastRotation = now
-	em.state.LastRandomNumber = fullRandom
-	em.state.NextRotationTime = now.Add(em.state.RotationInterval) // 设置下次轮换时间
-
-	fmt.Printf("New sequencer selected: %s (term=%d)\n"+
-		"Random=%s\n"+
-		"Weight=%d\n"+
-		"AccumScore=%d\n"+
-		"Next rotation at: %s\n",
-		selectedValidator.Address,
-		em.state.CurrentTerm,
-		fullRandom.String(),
-		selectedValidator.StakeAmount,
-		selectedValidator.WeightScore,
-		em.state.NextRotationTime.Format(time.RFC3339),
-	)
-
-	select {
-	case em.rotationCh <- selectedValidator.Address:
-	default:
-	}
-}
+//func (em *ElectionManager) RotateSequencer() {
+//	em.mu.Lock()
+//	defer em.mu.Unlock()
+//
+//	activeValidators := em.getActiveValidators()
+//	if len(activeValidators) == 0 {
+//		return
+//	}
+//
+//	// 获取L1链上的随机数
+//	fullRandom, err := em.ethClient.GetFullRandomNumber()
+//	if err != nil {
+//		fmt.Printf("Failed to get random number from L1: %v\n", err)
+//		return
+//	}
+//
+//	// 计算每个验证者的综合权重
+//	type validatorWeight struct {
+//		validator *Validator
+//		weight    *big.Int
+//	}
+//
+//	weights := make([]validatorWeight, len(activeValidators))
+//	totalWeight := new(big.Int)
+//
+//	for i, v := range activeValidators {
+//		// 1. 基础权重 = 质押金额
+//		baseWeight := new(big.Int).SetUint64(v.StakeAmount)
+//
+//		// 2. 计算公钥派生的权重因子
+//		pubKeyBytes, err := v.PublicKey.Raw()
+//		if err != nil {
+//			continue
+//		}
+//		pubKeyHash := ethCrypto.Keccak256(pubKeyBytes)
+//		pubKeyFactor := new(big.Int).SetBytes(pubKeyHash)
+//
+//		// 3. 累积权重分数
+//		accumWeight := new(big.Int).SetUint64(v.WeightScore)
+//		// 将累积权重转换为1.0到2.0之间的乘数
+//		// weightMultiplier = 1.0 + (accumWeight / 1000)
+//		weightMultiplier := new(big.Int).Add(
+//			big.NewInt(10), // 基础值1000
+//			accumWeight,    // 累积权重
+//		)
+//		// 4. 使用随机数和公钥计算动态系数
+//		dynamicFactor := new(big.Int).Xor(fullRandom, pubKeyFactor)
+//
+//		// 5. 综合权重计算
+//		// weight = baseWeight * weightMultiplier * dynamicFactor / 1000
+//		weight := new(big.Int).Mul(baseWeight, weightMultiplier) // 应用累积权重
+//		weight.Mul(weight, dynamicFactor)                        // 应用动态因子
+//		weight.Div(weight, big.NewInt(1000))                     // 归一化累积权重
+//
+//		weights[i] = validatorWeight{
+//			validator: v,
+//			weight:    weight,
+//		}
+//		totalWeight.Add(totalWeight, weight)
+//
+//		fmt.Printf("Validator weight calculation: %s\n"+
+//			"  Base Weight: %d\n"+
+//			"  Accum Score: %d\n"+
+//			"  Final Weight: %s\n",
+//			v.Address,
+//			v.StakeAmount,
+//			v.WeightScore,
+//			weight.String(),
+//		)
+//	}
+//
+//	// 使用随机数选择验证者
+//	selection := new(big.Int).Mod(fullRandom, totalWeight)
+//	var selectedValidator *Validator
+//	accum := new(big.Int)
+//
+//	for _, vw := range weights {
+//		accum.Add(accum, vw.weight)
+//		if selection.Cmp(accum) < 0 {
+//			selectedValidator = vw.validator
+//			break
+//		}
+//	}
+//
+//	if selectedValidator == nil {
+//		selectedValidator = activeValidators[0]
+//	}
+//
+//	// 更新权重分数
+//	for _, v := range activeValidators {
+//		if v.Address == selectedValidator.Address {
+//			// 被选中的验证者重置权重分数
+//			v.WeightScore = 0
+//		} else {
+//			// 未被选中的验证者增加权重分数
+//			v.WeightScore += 100 // 每轮增加100点权重
+//		}
+//	}
+//
+//	// 确保不会连续选择同一个排序器
+//	if selectedValidator.Address == em.state.CurrentSequencer && len(activeValidators) > 1 {
+//		// 使用不同的随机数部分重新选择
+//		altRandom := new(big.Int).Rsh(fullRandom, 128)
+//		nextBestWeight := new(big.Int).SetInt64(0)
+//		var nextBestValidator *Validator
+//
+//		for _, vw := range weights {
+//			if vw.validator.Address != em.state.CurrentSequencer {
+//				weightWithAlt := new(big.Int).Xor(vw.weight, altRandom)
+//				if nextBestValidator == nil || weightWithAlt.Cmp(nextBestWeight) > 0 {
+//					nextBestValidator = vw.validator
+//					nextBestWeight = weightWithAlt
+//				}
+//			}
+//		}
+//		selectedValidator = nextBestValidator
+//	}
+//
+//	// 更新状态
+//	now := time.Now()
+//	em.state.CurrentSequencer = selectedValidator.Address
+//	em.state.CurrentTerm++
+//	em.state.LastRotation = now
+//	em.state.LastRandomNumber = fullRandom
+//	em.state.NextRotationTime = now.Add(em.state.RotationInterval) // 设置下次轮换时间
+//
+//	fmt.Printf("New sequencer selected: %s (term=%d)\n"+
+//		"Random=%s\n"+
+//		"Weight=%d\n"+
+//		"AccumScore=%d\n"+
+//		"Next rotation at: %s\n",
+//		selectedValidator.Address,
+//		em.state.CurrentTerm,
+//		fullRandom.String(),
+//		selectedValidator.StakeAmount,
+//		selectedValidator.WeightScore,
+//		em.state.NextRotationTime.Format(time.RFC3339),
+//	)
+//
+//	select {
+//	case em.rotationCh <- selectedValidator.Address:
+//	default:
+//	}
+//}
 
 // 在区块处理时调用
 func (em *ElectionManager) OnBlockProduced(height uint64) {
@@ -271,30 +270,30 @@ func (em *ElectionManager) GetValidators() map[string]Validator {
 	return validatorMap
 }
 
-func (em *ElectionManager) RegisterValidator(pubKey crypto.PubKey, stake uint64) (*Validator, error) {
-	em.mu.Lock()
-	defer em.mu.Unlock()
-
-	// 检查质押金额
-	if stake < em.config.MinStakeAmount {
-		return nil, fmt.Errorf("insufficient stake amount: required %d, got %d",
-			em.config.MinStakeAmount, stake)
-	}
-	addr, _ := types.PublicKeyToAddress(pubKey)
-
-	// 创建验证者记录
-	validator := &Validator{
-		Address:     addr,
-		PublicKey:   pubKey,
-		Status:      Active,
-		StakeAmount: stake,
-		JoinTime:    time.Now(),
-	}
-
-	// 注册验证者
-	em.Validators[addr] = validator
-	return validator, nil
-}
+//func (em *ElectionManager) RegisterValidator(pubKey crypto.PubKey, stake uint64) (*Validator, error) {
+//	em.mu.Lock()
+//	defer em.mu.Unlock()
+//
+//	// 检查质押金额
+//	if stake < em.config.MinStakeAmount {
+//		return nil, fmt.Errorf("insufficient stake amount: required %d, got %d",
+//			em.config.MinStakeAmount, stake)
+//	}
+//	addr, _ := types.PublicKeyToAddress(pubKey)
+//
+//	// 创建验证者记录
+//	validator := &Validator{
+//		Address:     addr,
+//		PublicKey:   pubKey,
+//		Status:      Active,
+//		StakeAmount: stake,
+//		JoinTime:    time.Now(),
+//	}
+//
+//	// 注册验证者
+//	em.Validators[addr] = validator
+//	return validator, nil
+//}
 
 func (em *ElectionManager) getActiveValidators() []*Validator {
 	var active []*Validator

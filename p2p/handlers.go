@@ -120,6 +120,8 @@ func (n *Layer2Node) defaultBlockValidation(block Block, isHistoricalBlock bool)
 
 	// 检查block hash
 	if hash, err := CalculateBlockHash(&block); hash != block.Hash || err != nil {
+		fmt.Printf("Block Hash invalid: current=%s, real=%s\n",
+			block.Hash, hash)
 		return false
 	}
 	// 只有非历史区块才检查高度必须大于当前高度
@@ -176,10 +178,12 @@ func (n *Layer2Node) validateTxForBlock(tx *Transaction, isHistoricalBlock bool,
 	if !isHistoricalBlock {
 		if sequencerAddr == myAddress {
 			if _, exists := n.txPool.Load(tx.Hash); exists {
+				fmt.Println("本节点为排序器节点，但交易池中交易未正确清除")
 				return false
 			}
 		} else {
 			if _, exists := n.txPool.Load(tx.Hash); !exists {
+				fmt.Println("本节点为非排序器节点，但交易池中未含有该交易")
 				return false
 			}
 		}

@@ -23,18 +23,27 @@ const (
 	Pending
 )
 
+// StakeBucket 质押桶
+type StakeBucket struct {
+	ID            uint64   `json:"id"`
+	StakeAmount   uint64   `json:"stake_amount"`
+	MappedValue   *big.Int `json:"mapped_value"`   // 固定的映射值 x_i
+	CurrentWeight *big.Int `json:"current_weight"` // 当前轮次的权重 w_i
+}
+
 // Validator 验证者信息
 type Validator struct {
-	Address        string          `json:"address"`
-	PublicKey      crypto.PubKey   `json:"-"`          // 不直接序列化
-	PublicKeyBytes []byte          `json:"public_key"` // 用于序列化的字段
-	Status         ValidatorStatus `json:"status"`
-	StakeAmount    uint64          `json:"stake_amount"`
-	JoinTime       time.Time       `json:"join_time"`
-	BlocksProduced uint64          `json:"blocks_produced"`
-	LastBlockTime  time.Time       `json:"last_block_time"`
-	MissedBlocks   int             `json:"missed_blocks"`
-	WeightScore    uint64          `json:"weight_score"`
+	Address        string                  `json:"address"`
+	PublicKey      crypto.PubKey           `json:"-"`          // 不直接序列化
+	PublicKeyBytes []byte                  `json:"public_key"` // 用于序列化的字段
+	Status         ValidatorStatus         `json:"status"`
+	StakeAmount    uint64                  `json:"stake_amount"`
+	JoinTime       time.Time               `json:"join_time"`
+	Buckets        map[uint64]*StakeBucket `json:"buckets"` // 桶ID到质押桶的映射
+	BlocksProduced uint64                  `json:"blocks_produced"`
+	LastBlockTime  time.Time               `json:"last_block_time"`
+	MissedBlocks   int                     `json:"missed_blocks"`
+	WeightScore    uint64                  `json:"weight_score"`
 }
 
 // ConsensusConfig 共识配置

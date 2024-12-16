@@ -144,7 +144,7 @@ func (s *Sequencer) produceBlock() {
 		GasUsed:      totalGas, // 记录区块使用的总gas
 		GasLimit:     s.maxBlockGasLimit,
 	}
-
+	s.blockHeight = s.node.latestBlock
 	// 计算前一个区块的哈希
 	if s.blockHeight > 0 {
 		if prevBlock, ok := s.node.blockCache.Load(s.blockHeight); ok {
