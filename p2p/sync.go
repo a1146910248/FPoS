@@ -117,6 +117,11 @@ func (n *Layer2Node) handleTxMessages() {
 			if err := json.Unmarshal(pending.msg.Data, &tx); err == nil {
 				if n.validateTransaction(tx) {
 					n.txPool.Store(tx.Hash, tx)
+					n.IncrementTxCount()
+					// 更新活跃用户统计
+					stats := GetStats()
+					stats.UpdateActiveUser(tx.From)
+					stats.UpdateActiveUser(tx.To)
 					fmt.Printf("Processed pending transaction: from=%s, nonce=%d\n",
 						tx.From, tx.Nonce)
 				}
@@ -160,6 +165,11 @@ func (n *Layer2Node) handleTxMessages() {
 		if err := json.Unmarshal(msg.Data, &tx); err == nil {
 			if n.validateTransaction(tx) {
 				n.txPool.Store(tx.Hash, tx)
+				n.IncrementTxCount()
+				// 更新活跃用户统计
+				stats := GetStats()
+				stats.UpdateActiveUser(tx.From)
+				stats.UpdateActiveUser(tx.To)
 				fmt.Printf("Processed transaction directly: from=%s, nonce=%d\n",
 					tx.From, tx.Nonce)
 				//n.BroadcastTransaction(tx)

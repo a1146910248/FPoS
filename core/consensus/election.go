@@ -48,6 +48,9 @@ func NewElectionManager(ctx context.Context, config *ConsensusConfig) *ElectionM
 func (em *ElectionManager) SetEth(eth *ethereum.EthereumClient) {
 	em.ethClient = eth
 }
+func (em *ElectionManager) GetEth() *ethereum.EthereumClient {
+	return em.ethClient
+}
 
 func (em *ElectionManager) GetState() ElectionState {
 	return *em.state

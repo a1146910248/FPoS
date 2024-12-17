@@ -35,6 +35,8 @@ type Layer2Node struct {
 	topic                P2PTopic
 	blockCache           *sync.Map
 	txPool               *sync.Map
+	txCountMu            sync.RWMutex
+	txCount              uint64 //交易数量统计
 	stateRoot            string
 	latestBlock          uint64
 	handlers             types.Handlers
@@ -292,6 +294,8 @@ func (n *Layer2Node) Start() error {
 			return err
 		}
 	}
+	// 初始化状态记录节点
+	InitStats(n, n.electionMgr.GetEth(), n.electionMgr)
 	// 连接到引导节点
 	if len(n.bootstrapPeers) > 0 {
 		// 先等待同步

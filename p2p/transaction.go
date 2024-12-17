@@ -282,3 +282,17 @@ func (n *Layer2Node) removeFromTxPool(tx *types.Transaction) {
 	n.txPool.Delete(tx.Hash)
 	n.stateDB.RestorePendingState(tx)
 }
+
+// GetTotalTxCount 获取总交易数
+func (node *Layer2Node) GetTotalTxCount() uint64 {
+	node.txCountMu.RLock()
+	defer node.txCountMu.RUnlock()
+	return node.txCount
+}
+
+// IncrementTxCount 增加交易计数
+func (node *Layer2Node) IncrementTxCount() {
+	node.txCountMu.Lock()
+	node.txCount++
+	node.txCountMu.Unlock()
+}
