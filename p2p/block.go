@@ -41,6 +41,11 @@ func (n *Layer2Node) processNewBlock(block Block, isHistoricalBlock bool) error 
 	if n.electionMgr != nil {
 		n.electionMgr.OnBlockProduced(block.Height)
 	}
+
+	// 更新统计信息
+	stats := GetStats()
+	stats.UpdateBlockHeight(block.Height)
+	stats.UpdateTxCount(n.GetTotalTxCount()) // 需要实现此方法
 	return nil
 }
 

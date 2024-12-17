@@ -3,14 +3,24 @@ package main
 import (
 	"FPoS/config"
 	"FPoS/core/ethereum"
+	"FPoS/dashboard/app"
 	"FPoS/p2p"
-	"FPoS/types"
+	"FPoS/pkg/logging"
 	"context"
 	"fmt"
+	"github.com/spf13/viper"
 	"os"
 	"os/signal"
 	"syscall"
 )
+
+var logger *logging.Logger
+
+func init() {
+	logger = logging.GetLogger()
+	// 初始化配置文件
+	InitConfig()
+}
 
 func main() {
 	ctx := context.Background()
@@ -53,6 +63,8 @@ func main() {
 		if err := p2p.SaveBootstrapInfo(addr); err != nil {
 			panic(err)
 		}
+		// 初始化gin后端
+		app.App.Init()
 		fmt.Printf("Bootstrap node started: %s\n", addr)
 	} else {
 		// 读取引导节点信息
@@ -88,16 +100,23 @@ func main() {
 	<-sigChan
 }
 
-func setHandler(node *p2p.Layer2Node) {
-	// 设置交易处理器
-	node.SetTransactionHandler(func(tx types.Transaction) bool {
-		// 实现交易验证逻辑
-		return true
-	})
+const (
+	CONFIG_PATH = "config/"
+)
 
-	// 设置区块处理器
-	node.SetBlockHandler(func(block types.Block) bool {
-		// 实现区块验证逻辑
-		return true
-	})
+func InitConfig() {
+	// 环境变量指定加载环境
+	env := os.Getenv("ENV")
+	if env == "" {
+		env = "dev"
+	}
+	// 设置配置文件名和路径
+	viper.SetConfigName(fmt.Sprintf("env.%s", env))
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(CONFIG_PATH)
+	err := viper.ReadInConfig()
+	if err != nil {
+		panic(fmt.Errorf("fatal error config file: %w", err))
+	}
+	logger.Info("配置文件读取成功！！")
 }
