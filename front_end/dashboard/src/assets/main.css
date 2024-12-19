@@ -1,35 +1,78 @@
-@import './base.css';
+@import "font.css";
+/*全局滚动条*/
+/*滚动条的宽度和高度*/
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  width: 5px;
+  background-color: rgba(238, 238, 238, 0.5);
+  -webkit-border-radius: 4px;
+  -moz-border-radius: 4px;
+  border-radius: 4px;
+}
+/*滚动条的设置*/
+::-webkit-scrollbar-thumb {
+  background-color: rgba(193, 193, 193, 0.75);
+  background-clip: padding-box;
+  min-height: 28px;
+  -webkit-border-radius: 4px;
+  -moz-border-radius: 4px;
+  border-radius: 4px;
+}
+/*滚动条移上去显示的的颜色*/
+::-webkit-scrollbar-thumb:hover {
+  background-color: #666666;
+}
+/* 适用于大屏幕 */
+@media (min-width: 1024px) {
+  ::-webkit-scrollbar {
+    width: 12px; /* 大屏幕下的滚动条宽度 */
+  }
+}
+
+/* 适用于中等屏幕 */
+@media (max-width: 1024px) and (min-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 8px; /* 中等屏幕下的滚动条宽度 */
+  }
+}
+
+/* 适用于小屏幕 */
+@media (max-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 6px; /* 小屏幕下的滚动条宽度 */
+  }
+}
 
 #app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  font-weight: normal;
+  font-family: "PingFang SC", HarmonyOS_Regular, "Helvetica Neue", "Microsoft YaHei", sans-serif;
 }
 
-a,
-.green {
-  text-decoration: none;
-  color: hsla(160, 100%, 37%, 1);
-  transition: 0.4s;
-  padding: 3px;
+/* 覆盖默认的element样式*/
+.el-message-box {
+  background-color: #f5f5f5;
+  border-radius: 10px;
 }
-
-@media (hover: hover) {
-  a:hover {
-    background-color: hsla(160, 100%, 37%, 0.2);
+.el-message-box__btns{
+  display: flex;
+  flex-wrap: nowrap;
+  .el-button {
+    width: 100px;
+    height: 30px;
+    background-color: #ffffff;
+    color: #18191c;
+    border-color: #e3e5e7;
+  }
+  .el-button--primary {
+    color:white;
+    border-color: #e3e5e7;
+    background-color: #00aeec;
   }
 }
-
-@media (min-width: 1024px) {
-  body {
-    display: flex;
-    place-items: center;
-  }
-
-  #app {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    padding: 0 2rem;
-  }
+.el-dialog {
+  border-radius: 5px;
+  padding: 16px 24px;
 }

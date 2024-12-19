@@ -9,3 +9,21 @@ export interface StatsResp {
   l1_balance:string
   l2_tps:number
 }
+
+export interface Transaction {
+  hash: string
+  from: string
+  to: string
+  value: number
+  nonce: number
+  gas_price: number
+  gas_limit: number
+  gas_used: number
+  timestamp: string
+  status: number
+}
+
+export interface TransactionList {
+  total: number
+  list: Transaction[]
+}
