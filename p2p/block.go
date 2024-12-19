@@ -298,6 +298,11 @@ func (n *Layer2Node) cleanTxPoolAndPendingStates(txs []Transaction) {
 			return true
 		})
 	}
+
+	// 将交易保存到历史记录
+	for _, tx := range txs {
+		n.txHistory.Store(tx.Hash, tx)
+	}
 }
 
 // 处理新区块

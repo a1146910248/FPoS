@@ -5,9 +5,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"golang.org/x/crypto/sha3"
 	"math/rand"
+	"sort"
 	"time"
+
+	"golang.org/x/crypto/sha3"
 )
 
 func (n *Layer2Node) StartPeriodicTransaction() {
@@ -284,15 +286,89 @@ func (n *Layer2Node) removeFromTxPool(tx *types.Transaction) {
 }
 
 // GetTotalTxCount 获取总交易数
-func (node *Layer2Node) GetTotalTxCount() uint64 {
-	node.txCountMu.RLock()
-	defer node.txCountMu.RUnlock()
-	return node.txCount
+func (n *Layer2Node) GetTotalTxCount() uint64 {
+	n.txCountMu.RLock()
+	defer n.txCountMu.RUnlock()
+	return n.txCount
 }
 
 // IncrementTxCount 增加交易计数
-func (node *Layer2Node) IncrementTxCount() {
-	node.txCountMu.Lock()
-	node.txCount++
-	node.txCountMu.Unlock()
+func (n *Layer2Node) IncrementTxCount() {
+	n.txCountMu.Lock()
+	n.txCount++
+	n.txCountMu.Unlock()
+}
+
+// GetTransactions 获取指定范围的交易
+func GetTransactions(limit int, offset int) []types.Transaction {
+	node := GetNode()
+	if node == nil {
+		return []types.Transaction{}
+	}
+	return node.GetTransactions(limit, offset)
+}
+
+// GetTotalTransactions 获取总交易数
+func GetTotalTransactions() int {
+	node := GetNode()
+	if node == nil {
+		return 0
+	}
+	return node.GetTotalTransactions()
+}
+
+// 节点级别的方法保持不变，但改名以区分
+func (n *Layer2Node) GetTransactions(limit int, offset int) []types.Transaction {
+	transactions := make([]types.Transaction, 0)
+
+	// 收集所有交易（包括待确认和已确认的）
+	var allTxs []types.Transaction
+
+	// 从交易池获取待确认交易
+	n.txPool.Range(func(_, value interface{}) bool {
+		if tx, ok := value.(types.Transaction); ok {
+			allTxs = append(allTxs, tx)
+		}
+		return true
+	})
+
+	// 从历史记录获取已确认交易
+	n.txHistory.Range(func(_, value interface{}) bool {
+		if tx, ok := value.(types.Transaction); ok {
+			allTxs = append(allTxs, tx)
+		}
+		return true
+	})
+
+	// 按时间戳排序，最新的交易在前
+	sort.Slice(allTxs, func(i, j int) bool {
+		return allTxs[i].Timestamp.After(allTxs[j].Timestamp)
+	})
+
+	// 应用分页
+	start := offset
+	end := offset + limit
+	if start >= len(allTxs) {
+		return transactions
+	}
+	if end > len(allTxs) {
+		end = len(allTxs)
+	}
+
+	return allTxs[start:end]
+}
+
+func (n *Layer2Node) GetTotalTransactions() int {
+	var count int
+	// 计算交易池中的交易数量
+	n.txPool.Range(func(_, _ interface{}) bool {
+		count++
+		return true
+	})
+	// 计算历史记录中的交易数量
+	n.txHistory.Range(func(_, _ interface{}) bool {
+		count++
+		return true
+	})
+	return count
 }

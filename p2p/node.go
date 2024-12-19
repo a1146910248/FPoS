@@ -27,6 +27,16 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
 )
 
+var (
+	globalNode *Layer2Node
+	nodeOnce   sync.Once
+)
+
+// GetNode 获取全局节点实例
+func GetNode() *Layer2Node {
+	return globalNode
+}
+
 type Layer2Node struct {
 	host                 host.Host
 	dht                  *dht.IpfsDHT
@@ -36,7 +46,9 @@ type Layer2Node struct {
 	blockCache           *sync.Map
 	txPool               *sync.Map
 	txCountMu            sync.RWMutex
-	txCount              uint64 //交易数量统计
+	txCount              uint64    //交易数量统计
+	txHistory            *sync.Map // 存储所有历史交易
+	txHistoryMu          sync.RWMutex
 	stateRoot            string
 	latestBlock          uint64
 	handlers             types.Handlers
@@ -65,6 +77,13 @@ type P2PTopic struct {
 }
 
 const pubsubMaxSize = 1 << 22 // 4 MB
+
+// SetGlobalNode 设置全局节点实例
+func SetGlobalNode(node *Layer2Node) {
+	nodeOnce.Do(func() {
+		globalNode = node
+	})
+}
 
 func NewLayer2Node(ctx context.Context, port int, bootstrapPeers []string, privKeyBytes []byte) (*Layer2Node, error) {
 	var privateKey crypto.PrivKey
@@ -121,6 +140,7 @@ func NewLayer2Node(ctx context.Context, port int, bootstrapPeers []string, privK
 		ctx:            ctx,
 		blockCache:     &sync.Map{},
 		txPool:         &sync.Map{},
+		txHistory:      &sync.Map{},
 		pingService:    pingService,
 		bootstrapPeers: bootstrapPeers, // 保存引导节点地址
 		privateKey:     privateKey,
@@ -169,6 +189,8 @@ func initState(node *Layer2Node, bootstrapPeers []string) error {
 	// 初始化nonce为0
 	node.stateDB.GetAccount(pub)
 
+	// 设置全局节点实例
+	SetGlobalNode(node)
 	fmt.Printf("节点地址: %s, 初始余额: %d\n", pub, node.stateDB.GetBalance(pub))
 
 	return nil
