@@ -35,5 +35,6 @@ type Transaction struct {
 	GasLimit  uint64    `json:"gas_limit"`
 	GasUsed   uint64    `json:"gas_used"`
 	Timestamp time.Time `json:"timestamp"`
-	Status    int       `json:"status"` // 1成功 0失败
+	Status    int       `json:"status"`     // 使用枚举值 0-4
+	BlockHash string    `json:"block_hash"` // 所属区块hash
 }

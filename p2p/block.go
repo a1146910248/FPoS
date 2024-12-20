@@ -26,7 +26,7 @@ func (n *Layer2Node) processNewBlock(block Block, isHistoricalBlock bool) error 
 	}
 
 	// 使用新的方法原子性地处理交易池和待处理状态
-	n.cleanTxPoolAndPendingStates(block.Transactions)
+	n.cleanTxPoolAndPendingStates(block.Transactions, block.Hash)
 
 	// 更新状态
 	n.latestBlock = block.Height
@@ -248,7 +248,7 @@ func CalculateBlockHash(block *Block) (string, error) {
 	hash := sha256.Sum256(data)
 	return hex.EncodeToString(hash[:]), nil
 }
-func (n *Layer2Node) cleanTxPoolAndPendingStates(txs []Transaction) {
+func (n *Layer2Node) cleanTxPoolAndPendingStates(txs []Transaction, blockHash string) {
 	n.stateDB.Lock()
 
 	// 创建交易 map 用于快速查找
@@ -301,6 +301,9 @@ func (n *Layer2Node) cleanTxPoolAndPendingStates(txs []Transaction) {
 
 	// 将交易保存到历史记录
 	for _, tx := range txs {
+		// 更新状态
+		tx.StatLog.Status = TxStatusConfirmed
+		tx.StatLog.BlockHash = blockHash
 		n.txHistory.Store(tx.Hash, tx)
 	}
 }
@@ -319,7 +322,7 @@ func (n *Layer2Node) processNewBlockInternal(block Block, isHistoricalBlock bool
 	}
 
 	// 使用新的方法原子性地处理交易池和待处理状态
-	n.cleanTxPoolAndPendingStates(block.Transactions)
+	n.cleanTxPoolAndPendingStates(block.Transactions, block.Hash)
 
 	// 更新状态
 	n.latestBlock = block.Height

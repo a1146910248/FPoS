@@ -280,3 +280,337 @@
 [2024-12-18 17:47:57] [error] websocket write failed:write tcp [::1]:8080->[::1]:64943: wsasend: An established connection was aborted by the software in your host machine.
 [2024-12-18 17:47:58] [error] websocket write failed:write tcp [::1]:8080->[::1]:64954: wsasend: An established connection was aborted by the software in your host machine.
 [2024-12-19 10:09:48] [error] websocket write failed:write tcp [::1]:8080->[::1]:65028: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 11:43:11] [info] 配置文件读取成功！！
+[2024-12-20 11:43:27] [info] 配置文件读取成功！！
+[2024-12-20 11:43:41] [info] 配置文件读取成功！！
+[2024-12-20 11:44:04] [error] websocket write failed:write tcp [::1]:8080->[::1]:53560: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 15:13:15] [info] 配置文件读取成功！！
+[2024-12-20 15:13:28] [info] 配置文件读取成功！！
+[2024-12-20 15:13:43] [info] 配置文件读取成功！！
+[2024-12-20 15:14:30] [error] websocket write failed:write tcp [::1]:8080->[::1]:50363: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 15:14:36] [error] websocket write failed:write tcp [::1]:8080->[::1]:50432: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 15:14:41] [error] websocket write failed:write tcp [::1]:8080->[::1]:50441: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 15:15:01] [error] websocket write failed:write tcp [::1]:8080->[::1]:50480: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 15:15:43] [error] websocket write failed:write tcp [::1]:8080->[::1]:50495: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 15:19:18] [info] 配置文件读取成功！！
+[2024-12-20 15:19:33] [info] 配置文件读取成功！！
+[2024-12-20 15:19:46] [info] 配置文件读取成功！！
+[2024-12-20 15:20:07] [error] websocket write failed:write tcp [::1]:8080->[::1]:50760: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 15:20:07] [error] websocket write failed:write tcp [::1]:8080->[::1]:50761: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 15:20:08] [error] websocket write failed:write tcp [::1]:8080->[::1]:50758: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 15:20:08] [error] websocket write failed:write tcp [::1]:8080->[::1]:50759: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 15:20:22] [error] websocket write failed:write tcp [::1]:8080->[::1]:50773: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 15:20:25] [error] websocket write failed:write tcp [::1]:8080->[::1]:50806: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 15:20:32] [error] websocket write failed:write tcp [::1]:8080->[::1]:50822: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 15:20:39] [error] websocket write failed:write tcp [::1]:8080->[::1]:50911: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 15:20:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:50969: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 15:21:02] [error] websocket write failed:write tcp [::1]:8080->[::1]:51042: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 15:21:04] [error] websocket write failed:write tcp [::1]:8080->[::1]:51051: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 15:44:13] [error] websocket write failed:write tcp [::1]:8080->[::1]:51227: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 15:44:13] [error] websocket write failed:write tcp [::1]:8080->[::1]:51057: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 15:44:13] [error] websocket write failed:write tcp [::1]:8080->[::1]:51485: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 15:44:13] [error] websocket write failed:write tcp [::1]:8080->[::1]:51211: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 15:44:13] [error] websocket write failed:write tcp [::1]:8080->[::1]:51168: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 15:44:13] [error] websocket write failed:write tcp [::1]:8080->[::1]:51432: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 15:44:14] [error] websocket write failed:write tcp [::1]:8080->[::1]:51083: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 15:44:14] [error] websocket write failed:write tcp [::1]:8080->[::1]:51451: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 15:44:14] [error] websocket write failed:write tcp [::1]:8080->[::1]:52232: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 15:44:14] [error] websocket write failed:write tcp [::1]:8080->[::1]:51108: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 15:49:13] [error] websocket write failed:write tcp [::1]:8080->[::1]:53095: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 15:56:24] [error] websocket write failed:write tcp [::1]:8080->[::1]:53232: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 15:56:24] [error] websocket write failed:write tcp [::1]:8080->[::1]:53851: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 15:56:25] [error] websocket write failed:write tcp [::1]:8080->[::1]:53799: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:02:59] [error] websocket write failed:write tcp [::1]:8080->[::1]:53965: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:03:00] [error] websocket write failed:write tcp [::1]:8080->[::1]:54145: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:03:00] [error] websocket write failed:write tcp [::1]:8080->[::1]:54173: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:03:07] [error] websocket write failed:write tcp [::1]:8080->[::1]:54493: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:04:55] [error] websocket write failed:write tcp [::1]:8080->[::1]:54505: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:13:46] [info] 配置文件读取成功！！
+[2024-12-20 16:14:00] [info] 配置文件读取成功！！
+[2024-12-20 16:14:16] [info] 配置文件读取成功！！
+[2024-12-20 16:16:01] [info] 配置文件读取成功！！
+[2024-12-20 16:16:15] [info] 配置文件读取成功！！
+[2024-12-20 16:16:31] [info] 配置文件读取成功！！
+[2024-12-20 16:17:21] [error] websocket write failed:write tcp [::1]:8080->[::1]:55933: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:21] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:55935: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:21] [error] websocket write failed:write tcp [::1]:8080->[::1]:55937: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:21] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:55939: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:21] [error] websocket write failed:write tcp [::1]:8080->[::1]:55941: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:21] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:55943: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:21] [error] websocket write failed:write tcp [::1]:8080->[::1]:55944: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:21] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:55945: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:21] [error] websocket write failed:write tcp [::1]:8080->[::1]:55946: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:21] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:55947: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:21] [error] websocket write failed:write tcp [::1]:8080->[::1]:55948: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:21] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:55949: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:21] [error] websocket write failed:write tcp [::1]:8080->[::1]:55950: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:21] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:55951: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:21] [error] websocket write failed:write tcp [::1]:8080->[::1]:55953: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:21] [error] websocket write failed:write tcp [::1]:8080->[::1]:55965: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:21] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:55955: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:21] [error] websocket write failed:write tcp [::1]:8080->[::1]:55957: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:21] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:55958: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:21] [error] websocket write failed:write tcp [::1]:8080->[::1]:55969: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:55857: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp [::1]:8080->[::1]:55865: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:55866: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp [::1]:8080->[::1]:55867: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp [::1]:8080->[::1]:55870: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:55869: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:55871: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp [::1]:8080->[::1]:55873: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:55875: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp [::1]:8080->[::1]:55877: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:55879: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp [::1]:8080->[::1]:55881: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:55883: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp [::1]:8080->[::1]:55885: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp [::1]:8080->[::1]:55962: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp [::1]:8080->[::1]:55970: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:55887: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp [::1]:8080->[::1]:55963: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp [::1]:8080->[::1]:55971: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp [::1]:8080->[::1]:55889: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:55890: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp [::1]:8080->[::1]:55964: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp [::1]:8080->[::1]:55891: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:55893: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:55896: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp [::1]:8080->[::1]:55895: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp [::1]:8080->[::1]:55897: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:55899: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp [::1]:8080->[::1]:55901: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:55903: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp [::1]:8080->[::1]:55905: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:55907: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp [::1]:8080->[::1]:55909: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:55911: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp [::1]:8080->[::1]:55912: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:55913: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp [::1]:8080->[::1]:55914: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:55915: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp [::1]:8080->[::1]:55917: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:55919: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp [::1]:8080->[::1]:55921: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:55923: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp [::1]:8080->[::1]:55925: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:55927: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp [::1]:8080->[::1]:55929: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:17:22] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:55931: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 16:19:18] [info] 配置文件读取成功！！
+[2024-12-20 16:19:33] [info] 配置文件读取成功！！
+[2024-12-20 16:26:39] [info] 配置文件读取成功！！
+[2024-12-20 16:26:55] [info] 配置文件读取成功！！
+[2024-12-20 16:27:18] [info] 配置文件读取成功！！
+[2024-12-20 16:30:13] [info] 配置文件读取成功！！
+[2024-12-20 16:30:27] [info] 配置文件读取成功！！
+[2024-12-20 16:30:42] [info] 配置文件读取成功！！
+[2024-12-20 16:32:03] [info] 配置文件读取成功！！
+[2024-12-20 16:32:15] [info] 配置文件读取成功！！
+[2024-12-20 16:32:28] [info] 配置文件读取成功！！
+[2024-12-20 17:14:44] [info] 配置文件读取成功！！
+[2024-12-20 17:15:23] [info] 配置文件读取成功！！
+[2024-12-20 17:17:11] [info] 配置文件读取成功！！
+[2024-12-20 17:18:08] [info] 配置文件读取成功！！
+[2024-12-20 17:19:52] [info] 配置文件读取成功！！
+[2024-12-20 17:20:01] [info] 配置文件读取成功！！
+[2024-12-20 17:25:49] [info] 配置文件读取成功！！
+[2024-12-20 17:28:12] [info] 配置文件读取成功！！
+[2024-12-20 17:28:30] [info] 配置文件读取成功！！
+[2024-12-20 17:28:45] [info] 配置文件读取成功！！
+[2024-12-20 17:33:31] [info] 配置文件读取成功！！
+[2024-12-20 17:33:48] [info] 配置文件读取成功！！
+[2024-12-20 17:34:05] [info] 配置文件读取成功！！
+[2024-12-20 17:34:55] [error] websocket write failed:write tcp [::1]:8080->[::1]:63522: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:55] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63521: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:55] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63523: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:55] [error] websocket write failed:write tcp [::1]:8080->[::1]:63524: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:55] [error] websocket write failed:write tcp [::1]:8080->[::1]:63702: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:55] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63525: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:55] [error] websocket write failed:write tcp [::1]:8080->[::1]:63526: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:55] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63704: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:55] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63527: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:55] [error] websocket write failed:write tcp [::1]:8080->[::1]:63706: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:55] [error] websocket write failed:write tcp [::1]:8080->[::1]:63529: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:55] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63530: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:55] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63708: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:55] [error] websocket write failed:write tcp [::1]:8080->[::1]:63531: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63533: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63535: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63537: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63538: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63539: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63541: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63543: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63545: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63547: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63549: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63551: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63552: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63553: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63555: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63557: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63559: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63561: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63563: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63565: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63567: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63570: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63569: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63391: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63571: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63398: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63397: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63579: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63399: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63581: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63401: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63583: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63403: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63585: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63405: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63587: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63588: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63407: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63589: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63409: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63591: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63592: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63411: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63593: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63594: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63413: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63415: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63595: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63597: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63417: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63419: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63600: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63598: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63421: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63601: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63424: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63423: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63603: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63425: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63765: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63605: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63427: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63608: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63607: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63429: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63610: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63609: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63431: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63611: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63433: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63613: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63435: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63436: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63615: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63437: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63618: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63617: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63439: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63619: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63735: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63441: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63621: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63443: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63623: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63445: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63446: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63625: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63447: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63627: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63628: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63449: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63450: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63629: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63451: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63631: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63453: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63633: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63634: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63855: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63456: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63455: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63635: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63636: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63856: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63457: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63637: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63459: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63639: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63640: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63461: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63641: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63463: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63643: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63465: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63646: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63648: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63467: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63469: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63651: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63649: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63472: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63652: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63474: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63475: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63719: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63654: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63476: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63656: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63720: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63478: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63658: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63659: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63480: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63660: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63482: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63662: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63484: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63664: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63486: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63666: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63488: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63668: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63490: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63670: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63493: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63492: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63673: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63672: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63494: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63674: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63676: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63496: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63498: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63678: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63500: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63680: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63503: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63682: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63505: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63684: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63507: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63686: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63509: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63688: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63511: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63690: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63693: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63513: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63692: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63515: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63516: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63694: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63517: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63696: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63519: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63520: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63698: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63699: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp 127.0.0.1:8080->127.0.0.1:63701: wsasend: An established connection was aborted by the software in your host machine.
+[2024-12-20 17:34:56] [error] websocket write failed:write tcp [::1]:8080->[::1]:63700: wsasend: An established connection was aborted by the software in your host machine.

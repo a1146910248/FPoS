@@ -53,10 +53,14 @@ func (em *ElectionManager) GetEth() *ethereum.EthereumClient {
 }
 
 func (em *ElectionManager) GetState() ElectionState {
+	em.mu.RLock()
+	defer em.mu.RUnlock()
 	return *em.state
 }
 
 func (em *ElectionManager) SetState(state *ElectionState) {
+	em.mu.Lock()
+	defer em.mu.Unlock()
 	em.state = state
 }
 

@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const _MaxBlockGasLimit_ = 2100
+const _MaxBlockGasLimit_ = 210000
 
 type Sequencer struct {
 	node             *Layer2Node
@@ -61,7 +61,9 @@ func (s *Sequencer) watchRotation() {
 			fmt.Printf("Node %s became the new sequencer\n", addr)
 		} else {
 			// 没被选上，将排序器清空
+			s.node.mu.Lock()
 			s.node.isSequencer = false
+			s.node.mu.Unlock()
 		}
 		s.mu.Unlock()
 	}

@@ -26,11 +26,20 @@ type EthereumConfig struct {
 }
 
 type EthereumClient struct {
-	client   *ethclient.Client
-	chainID  *big.Int
-	contract *Ethereum
-	config   *EthereumConfig
-	privKey  *ecdsa.PrivateKey
+	client     *ethclient.Client
+	chainID    *big.Int
+	contract   *Ethereum
+	config     *EthereumConfig
+	privKey    *ecdsa.PrivateKey
+	statusChan chan TxStatusEvent // 状态通知通道
+}
+
+// 添加交易状态事件类型
+type TxStatusEvent struct {
+	Block       types.Block
+	Status      int
+	L1TxHash    string
+	L1Timestamp time.Time
 }
 
 func NewEthereumClient(config *EthereumConfig) (*EthereumClient, error) {
@@ -58,12 +67,18 @@ func NewEthereumClient(config *EthereumConfig) (*EthereumClient, error) {
 	}
 
 	return &EthereumClient{
-		client:   client,
-		chainID:  chainID,
-		contract: contract,
-		config:   config,
-		privKey:  privKey,
+		client:     client,
+		chainID:    chainID,
+		contract:   contract,
+		config:     config,
+		privKey:    privKey,
+		statusChan: make(chan TxStatusEvent, 100),
 	}, nil
+}
+
+// GetStatusChannel 获取状态通知通道
+func (ec *EthereumClient) GetStatusChannel() <-chan TxStatusEvent {
+	return ec.statusChan
 }
 
 // getTransactOpts 获取交易选项
@@ -93,6 +108,10 @@ func (ec *EthereumClient) SubmitBlock(block *types.Block) error {
 	if err != nil {
 		return fmt.Errorf("failed to get transaction options: %v", err)
 	}
+	ec.statusChan <- TxStatusEvent{
+		Block:  *block,
+		Status: types.TxStatusL1Submit,
+	}
 
 	// 将区块哈希和状态根转换为[32]byte
 	blockHash := common.HexToHash(block.Hash)
@@ -101,19 +120,36 @@ func (ec *EthereumClient) SubmitBlock(block *types.Block) error {
 	// 使用生成的合约方法
 	tx, err := ec.contract.SubmitBlock(auth, block.Height, blockHash, stateRoot)
 	if err != nil {
+		ec.statusChan <- TxStatusEvent{
+			Block:  *block,
+			Status: types.TxStatusL1Failed,
+		}
 		return fmt.Errorf("failed to submit block: %v", err)
 	}
 
 	// 等待交易确认
 	receipt, err := ec.waitForTransaction(tx.Hash())
 	if err != nil {
+		ec.statusChan <- TxStatusEvent{
+			Block:  *block,
+			Status: types.TxStatusL1Failed,
+		}
 		return fmt.Errorf("failed to wait for transaction confirmation: %v", err)
 	}
 
 	if receipt.Status == 0 {
+		ec.statusChan <- TxStatusEvent{
+			Block:  *block,
+			Status: types.TxStatusL1Failed,
+		}
 		return fmt.Errorf("transaction failed")
 	}
-
+	ec.statusChan <- TxStatusEvent{
+		Block:       *block,
+		Status:      types.TxStatusL1Confirmed,
+		L1TxHash:    tx.Hash().String(),
+		L1Timestamp: time.Now(),
+	}
 	return nil
 }
 

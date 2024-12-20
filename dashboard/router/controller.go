@@ -203,7 +203,8 @@ func (t HttpController) GetTransactions(c *gin.Context) {
 			GasLimit:  tx.GasLimit,
 			GasUsed:   tx.GasUsed,
 			Timestamp: tx.Timestamp,
-			Status:    1, // 默认成功状态，如果需要可以从原始交易中获取
+			Status:    tx.StatLog.Status,
+			BlockHash: tx.StatLog.BlockHash,
 		}
 	}
 

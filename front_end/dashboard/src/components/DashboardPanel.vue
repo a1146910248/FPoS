@@ -1,7 +1,42 @@
 <template>
   <el-container>
     <el-header>
-      <h2 class="dashboard-title">Layer2 监控面板</h2>
+      <div class="header-container">
+        <div class="header-left">
+          <img src="@/assets/logo.png" alt="Logo" class="logo" />
+          <h2 class="dashboard-title">Layer2 监控面板</h2>
+        </div>
+        <div class="header-right">
+          <el-space :size="16" alignment="center">
+            <el-tag
+              :type="wsConnected ? 'success' : 'danger'"
+              size="large"
+              :effect="isDark ? 'dark' : 'light'"
+            >
+              <div class="network-status-wrapper">
+                <el-icon><Connection /></el-icon>
+                <span>{{ wsConnected ? '网络已连接' : '网络未连接' }}</span>
+              </div>
+            </el-tag>
+
+            <el-button
+              :type="isDark ? 'primary' : 'default'"
+              @click="toggleDark"
+            >
+              <el-icon>
+                <Moon v-if="!isDark" />
+                <Sunny v-else />
+              </el-icon>
+              {{ isDark ? '浅色模式' : '深色模式' }}
+            </el-button>
+
+            <el-button type="primary">
+              <el-icon><Setting /></el-icon>
+              设置
+            </el-button>
+          </el-space>
+        </div>
+      </div>
     </el-header>
 
     <el-main>
@@ -82,6 +117,15 @@
             <template #header>
               <div class="card-header">
                 <span>最新交易</span>
+                <el-button
+                  :loading="loading"
+                  type="primary"
+                  link
+                  @click="refreshTransactions"
+                >
+                  <el-icon><Refresh /></el-icon>
+                  刷新
+                </el-button>
               </div>
             </template>
             <el-table
@@ -134,9 +178,21 @@
               </el-table-column>
 
               <!-- 区块 -->
-              <el-table-column prop="block" label="区块" width="100">
+              <el-table-column prop="block" label="区块" width="160">
                 <template #default="{ row }">
-                  <el-link type="primary">{{ row.block }}</el-link>
+                  <div class="hash-container">
+                    <el-tooltip :content="row.hash" placement="top" effect="light">
+                      <span class="hash-text">{{ formatHash(row.block_hash) }}</span>
+                    </el-tooltip>
+                    <el-button
+                      class="copy-btn"
+                      type="primary"
+                      link
+                      @click="copyToClipboard(row.block_hash)"
+                    >
+                      <el-icon v-if="row.block_hash"><CopyDocument /></el-icon>
+                    </el-button>
+                  </div>
                 </template>
               </el-table-column>
 
@@ -221,12 +277,21 @@
               <el-table-column
                 prop="status"
                 label="状态"
-                width="100"
+                width="120"
                 fixed="right"
               >
                 <template #default="{ row }">
-                  <el-tag :type="row.status === 1 ? 'success' : 'danger'">
-                    {{ row.status === 1 ? '成功' : '失败' }}
+                  <el-tooltip
+                    :content="row.block_hash ? `区块: ${formatHash(row.block_hash)}` : ''"
+                    placement="top"
+                    v-if="row.status === TransactionStatus.Confirmed || row.status === TransactionStatus.L1Confirmed"
+                  >
+                    <el-tag :type="getStatusTagType(row.status)">
+                      {{ getStatusText(row.status) }}
+                    </el-tag>
+                  </el-tooltip>
+                  <el-tag v-else :type="getStatusTagType(row.status)">
+                    {{ getStatusText(row.status) }}
                   </el-tag>
                 </template>
               </el-table-column>
@@ -255,10 +320,12 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import * as echarts from 'echarts'
 import { getStats, getTransactions, subscribeToUpdates } from '@/http/http.dashboard'
 import type { StatsResp, Transaction } from '@/model/dashboardModel'
+import { TransactionStatus } from '@/model/dashboardModel'
 import relativeTime from 'dayjs/plugin/relativeTime'
+import { Refresh, Connection, Setting, Moon, Sunny } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
 import { ElMessage } from 'element-plus'
-import { formatEther } from 'ethers'
+import { useDark, useToggle } from '@vueuse/core'
 
 // 基础数据
 const stats = ref<StatsResp>({
@@ -272,6 +339,14 @@ const stats = ref<StatsResp>({
   l1_balance: '',
   l2_tps: 0
 })
+
+// 深色模式
+const isDark = useDark()
+const toggleDark = useToggle(isDark)
+
+// WebSocket 连接状态
+const wsConnected = ref(false)
+// let wsInstance: WebSocket | null = null
 
 // 图表相关
 const tpsChart = ref(null)
@@ -290,6 +365,30 @@ const pageSize = ref(15) // 默认显示15条
 const handleSizeChange = (val: number) => {
   pageSize.value = val
   fetchTransactions()
+}
+
+// 获取状态标签类型
+const getStatusTagType = (status: TransactionStatus): string => {
+  const types: { [key in TransactionStatus]: string } = {
+    [TransactionStatus.Pending]: 'info',
+    [TransactionStatus.Confirmed]: 'success',
+    [TransactionStatus.L1Submitting]: 'warning',
+    [TransactionStatus.L1Confirmed]: 'success',
+    [TransactionStatus.L1Failed]: 'danger'
+  }
+  return types[status]
+}
+
+// 获取状态文本
+const getStatusText = (status: TransactionStatus): string => {
+  const texts: { [key in TransactionStatus]: string } = {
+    [TransactionStatus.Pending]: '待确认',
+    [TransactionStatus.Confirmed]: 'L2已确认',
+    [TransactionStatus.L1Submitting]: 'L1提交中',
+    [TransactionStatus.L1Confirmed]: 'L1已确认',
+    [TransactionStatus.L1Failed]: 'L1失败'
+  }
+  return texts[status]
 }
 
 const formatBalance = (balance: string | number) => {
@@ -312,6 +411,26 @@ dayjs.locale('zh-cn')
 const copyToClipboard = (text: string) => {
   navigator.clipboard.writeText(text)
   ElMessage.success('已复制到剪贴板')
+}
+
+// 刷新交易列表
+const refreshTransactions = async () => {
+  if (loading.value) return
+
+  loading.value = true
+  try {
+    const data = await getTransactions(currentPage.value, pageSize.value)
+    if (data) {
+      transactionList.value = data.list
+      total.value = data.total
+      ElMessage.success('刷新成功')
+    }
+  } catch (error) {
+    console.error('刷新失败:', error)
+    ElMessage.error('刷新失败，请重试')
+  } finally {
+    loading.value = false
+  }
 }
 
 // 获取方法标签类型
@@ -428,8 +547,11 @@ const fetchTransactions = async () => {
 const subscribeUpdates = () => {
   subscribeToUpdates((data) => {
     if (data) {
+      wsConnected.value = true
       stats.value = data
       updateChart(data.current_tps)
+    } else {
+      wsConnected.value = false
     }
   })
 }
@@ -458,11 +580,87 @@ onUnmounted(() => {
 <style scoped>
 /* Header 样式 */
 .el-header {
-  padding: 0 20px;
+  padding: 0;
   background-color: white;
-  height: auto !important; /* 覆盖 element-plus 默认高度 */
-  line-height: normal;
-  border-bottom: 1px solid #e6e6e6;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  position: relative;
+  z-index: 100;
+}
+
+.header-container {
+  height: 60px;
+  padding: 0 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.logo {
+  height: 32px;
+  width: auto;
+}
+
+.dashboard-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  background: linear-gradient(45deg, #409EFF, #67C23A);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+}
+
+.network-status-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+}
+
+.el-tag {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  height: 32px;
+  border-radius: 6px;
+}
+
+/* 按钮样式优化 */
+.el-button {
+  border-radius: 6px;
+  transition: all 0.3s;
+}
+
+.el-button:hover {
+  transform: translateY(-1px);
+}
+
+.el-button .el-icon {
+  margin-right: 4px;
+  font-size: 16px;
+}
+
+/* 深色模式按钮样式 */
+.el-button .el-icon {
+  margin-right: 4px;
+  font-size: 16px;
+  vertical-align: middle;
+}
+
+.el-tag .el-icon {
+  margin-right: 4px;
+  font-size: 16px;
 }
 
 .dashboard-title {
@@ -474,15 +672,60 @@ onUnmounted(() => {
 }
 
 .el-main {
-  padding: 20px;
+  padding: 24px;
   background-color: #f0f2f5;
-  height: calc(100vh - 60px); /* 减去 header 高度 */
+  height: calc(100vh - 60px);
   overflow-y: auto;
 }
 
 /* 确保整个容器占满视口 */
 .el-container {
   height: 100vh;
+}
+
+/* 暗色模式支持 */
+:root {
+  --header-bg-color: #ffffff;
+  --header-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+html.dark {
+  --header-bg-color: var(--el-bg-color);
+  --header-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.el-header {
+  background-color: var(--header-bg-color);
+  box-shadow: var(--header-shadow);
+}
+
+/* 响应式调整 */
+@media screen and (max-width: 768px) {
+  .header-right .el-button span,
+  .network-status-wrapper span {
+    display: none;
+  }
+
+  .network-status-wrapper {
+    gap: 0;
+  }
+
+  .el-tag {
+    padding: 0 8px;
+  }
+}
+
+/* 暗色模式支持 */
+@media (prefers-color-scheme: dark) {
+  .el-header {
+    background-color: var(--el-bg-color);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+
+  .dashboard-title {
+    background: linear-gradient(45deg, #79bbff, #95d475);
+    -webkit-background-clip: text;
+  }
 }
 
 .chain-info {
@@ -508,6 +751,19 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+/* 刷新按钮的hover效果 */
+.el-button.el-button--primary.is-link:hover {
+  opacity: 0.8;
+}
+/* 刷新图标的旋转动画 */
+.el-icon {
+  margin-right: 4px;
+  transition: transform 0.3s ease;
+}
+.el-button:not(.is-loading):hover .el-icon {
+  transform: rotate(180deg);
 }
 
 .transaction-card :deep(.el-card__body) {
