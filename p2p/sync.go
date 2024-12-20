@@ -70,11 +70,19 @@ func (n *Layer2Node) setupTopics() error {
 	}
 	n.topic.txSyncTopic = txSyncTopic
 
+	// 添加交易状态 topic
+	txStatTopic, err := n.pubsub.Join("l2_tx_stat")
+	if err != nil {
+		return err
+	}
+	n.topic.txStatTopic = txStatTopic
+
 	go n.handleTxMessages()
 	go n.handleBlockMessages()
 	go n.handleStateMessages()
 	go n.handleTxSyncMessages()
 	go n.handleValidatorSyncMessage()
+	go n.handleTxStatMessage()
 
 	return nil
 }
@@ -327,6 +335,39 @@ func (n *Layer2Node) handleValidatorSyncMessage() {
 
 		if err = n.electionMgr.HandleValidatorMessage(msg.Data); err != nil {
 			fmt.Printf("Failed to handle validator message: %v\n", err)
+		}
+	}
+}
+
+func (n *Layer2Node) handleTxStatMessage() {
+	sub, err := n.topic.txStatTopic.Subscribe()
+	if err != nil {
+		return
+	}
+
+	for {
+		msg, err := sub.Next(n.ctx)
+		if err != nil {
+			fmt.Printf("Error receiving message: %v\n", err)
+			continue
+		}
+
+		// 忽略自己发送的消息
+		if msg.ReceivedFrom == n.host.ID() {
+			continue
+		}
+
+		// 添加日志以调试消息接收
+		fmt.Printf("Received validator message from: %s\n", msg.ReceivedFrom)
+
+		var txs []Transaction
+		if err := json.Unmarshal(msg.Data, &txs); err != nil {
+			fmt.Printf("Failed to handle validator message: %v\n", err)
+			continue
+		}
+		for _, tx := range txs {
+			// 更新交易历史
+			n.txHistory.Store(tx.Hash, tx)
 		}
 	}
 }
@@ -785,5 +826,15 @@ func (n *Layer2Node) BroadcastValidatorJoin(validator consensus.Validator, msgTy
 		return err
 	}
 	err = n.topic.validatorTopic.Publish(n.ctx, data)
+	return err
+}
+
+// 广播交易状态
+func (n *Layer2Node) broadcastTxStat(txs []Transaction) error {
+	data, err := json.Marshal(txs)
+	if err != nil {
+		return err
+	}
+	err = n.topic.txStatTopic.Publish(n.ctx, data)
 	return err
 }

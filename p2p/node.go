@@ -74,6 +74,7 @@ type P2PTopic struct {
 	stateTopic     *pubsub.Topic
 	txSyncTopic    *pubsub.Topic
 	validatorTopic *pubsub.Topic
+	txStatTopic    *pubsub.Topic
 }
 
 const pubsubMaxSize = 1 << 22 // 4 MB
@@ -362,6 +363,9 @@ func (n *Layer2Node) Start() error {
 			panic(err)
 		}
 	}
+	// 启动状态监听
+	go n.watchTxStatus()
+
 	// 同步其他的节点世界状态
 	if len(n.bootstrapPeers) > 0 {
 		if err := n.syncStateFromPeers(); err != nil {
@@ -369,6 +373,28 @@ func (n *Layer2Node) Start() error {
 		}
 	}
 	return nil
+}
+
+func (n *Layer2Node) watchTxStatus() {
+	ethClient := n.electionMgr.GetEth()
+	statusChan := ethClient.GetStatusChannel()
+	for event := range statusChan {
+		pubTxs := make([]types.Transaction, 0)
+
+		for _, eventTx := range event.Block.Transactions {
+			if tx, ok := n.txHistory.Load(eventTx.Hash); ok {
+				transaction := tx.(types.Transaction)
+				transaction.StatLog.Status = event.Status
+				transaction.StatLog.L1TxHash = event.L1TxHash
+				transaction.StatLog.L1Timestamp = event.L1Timestamp
+
+				// 更新交易历史
+				n.txHistory.Store(eventTx.Hash, transaction)
+				pubTxs = append(pubTxs, transaction)
+			}
+		}
+		n.broadcastTxStat(pubTxs)
+	}
 }
 
 func (n *Layer2Node) bootstrapStart() error {

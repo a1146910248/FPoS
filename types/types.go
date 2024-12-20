@@ -12,6 +12,15 @@ const (
 	GasPrice    uint64 = 20       // 默认gas价格
 )
 
+// Transaction 状态枚举
+const (
+	TxStatusPending     = 0 // 在交易池中等待
+	TxStatusConfirmed   = 1 // L2已确认（已打包进区块）
+	TxStatusL1Submit    = 2 // 正在提交到L1
+	TxStatusL1Confirmed = 3 // L1确认成功
+	TxStatusL1Failed    = 4 // L1确认失败
+)
+
 // 交易结构
 type Transaction struct {
 	Hash      string    `json:"hash"`
@@ -24,6 +33,13 @@ type Transaction struct {
 	GasUsed   uint64    `json:"gasUsed"`  // 实际使用的gas数量
 	Timestamp time.Time `json:"timestamp"`
 	Signature []byte    `json:"signature"`
+	StatLog   StatLog   `json:"stat_log"`
+}
+type StatLog struct {
+	Status      int       `json:"status"`       // 交易状态
+	BlockHash   string    `json:"block_hash"`   // 所属区块hash
+	L1TxHash    string    `json:"l1_tx_hash"`   // L1交易hash（如果已提交到L1）
+	L1Timestamp time.Time `json:"l1_timestamp"` // L1确认时间
 }
 
 // 区块结构

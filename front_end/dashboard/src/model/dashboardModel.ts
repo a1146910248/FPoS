@@ -20,7 +20,16 @@ export interface Transaction {
   gas_limit: number
   gas_used: number
   timestamp: string
-  status: number
+  status: TransactionStatus
+  block_hash?: string  // 所属区块hash，可选
+}
+
+export enum TransactionStatus {
+  Pending = 0,        // 在交易池中等待
+  Confirmed = 1,      // 已被区块确认
+  L1Submitting = 2,   // 正在提交到L1
+  L1Confirmed = 3,    // L1确认成功
+  L1Failed = 4,       // L1确认失败
 }
 
 export interface TransactionList {

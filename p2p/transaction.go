@@ -23,7 +23,7 @@ func (n *Layer2Node) StartPeriodicTransaction() {
 	n.mu.Unlock()
 
 	go func() {
-		ticker := time.NewTicker(1000 * time.Millisecond)
+		ticker := time.NewTicker(50 * time.Millisecond)
 		defer ticker.Stop()
 
 		// 获取本节点的地址
@@ -32,12 +32,12 @@ func (n *Layer2Node) StartPeriodicTransaction() {
 			fmt.Printf("生成发送方地址失败: %v\n", err)
 			return
 		}
-
 		for {
 			select {
 			case <-n.ctx.Done():
 				return
 			case <-ticker.C:
+				//default:
 				// 检查是否为 sequencer
 				n.mu.RLock()
 				isSeq := n.isSequencer
@@ -63,7 +63,8 @@ func (n *Layer2Node) StartPeriodicTransaction() {
 					GasPrice:  types.GasPrice,
 					Timestamp: time.Now(),
 				}
-
+				// 交易初始状态
+				tx.StatLog.Status = types.TxStatusPending
 				// 计算交易哈希
 				hash, err := calculateTxHash(&tx)
 				if err != nil {
