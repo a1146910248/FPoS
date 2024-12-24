@@ -346,7 +346,7 @@ const toggleDark = useToggle(isDark)
 
 // WebSocket 连接状态
 const wsConnected = ref(false)
-// let wsInstance: WebSocket | null = null
+let wsInstance: WebSocket | null = null
 
 // 图表相关
 const tpsChart = ref(null)
@@ -543,18 +543,48 @@ const fetchTransactions = async () => {
   }
 }
 
-// WebSocket订阅
+// // WebSocket订阅
+// const subscribeUpdates = () => {
+//   subscribeToUpdates((data) => {
+//     if (data) {
+//       wsConnected.value = true
+//       stats.value = data
+//       updateChart(data.current_tps)
+//     } else {
+//       wsConnected.value = false
+//     }
+//   })
+// }
+// 初始化 WebSocket 并处理连接状态
 const subscribeUpdates = () => {
-  subscribeToUpdates((data) => {
+  wsInstance = subscribeToUpdates((data) => {
+    // 处理接收到的数据
     if (data) {
       wsConnected.value = true
       stats.value = data
       updateChart(data.current_tps)
-    } else {
-      wsConnected.value = false
     }
   })
+
+  // 添加连接状态监听
+  if (wsInstance) {
+    wsInstance.onopen = () => {
+      console.log('WebSocket连接已建立')
+      wsConnected.value = true
+    }
+
+    wsInstance.onclose = () => {
+      console.log('WebSocket连接已关闭')
+      wsConnected.value = false
+    }
+
+    wsInstance.onerror = () => {
+      console.error('WebSocket连接错误')
+      wsConnected.value = false
+    }
+  }
 }
+
 
 // 生命周期钩子
 onMounted(() => {

@@ -15,7 +15,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 )
 
-const MaxMessageSize = 3 * 1024 * 1024 // 0.5MB限制
+const MaxMessageSize = 2 * 1024 * 1024 // 0.5MB限制
 
 // 添加消息类型标识
 type MessageType int

@@ -4,6 +4,7 @@ import (
 	"FPoS/config"
 	"FPoS/core/consensus"
 	"FPoS/core/ethereum"
+	"FPoS/pkg/logging"
 	"FPoS/types"
 	"context"
 	"crypto/rand"
@@ -30,6 +31,7 @@ import (
 var (
 	globalNode *Layer2Node
 	nodeOnce   sync.Once
+	logger     = logging.GetLogger()
 )
 
 // GetNode 获取全局节点实例

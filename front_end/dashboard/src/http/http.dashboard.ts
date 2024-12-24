@@ -64,9 +64,6 @@ export const subscribeToUpdates = (callback: (data: any) => void) => {
 
   ws.onerror = (error) => {
     console.error('WebSocket错误:', error)
-    setTimeout(() => {
-      subscribeToUpdates(callback)
-    }, 5000)
   }
 
   ws.onclose = () => {
