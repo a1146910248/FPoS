@@ -58,9 +58,9 @@ func NewStateDB() *StateDB {
 
 // GetAccount 获取账户状态，如果不存在则创建
 func (s *StateDB) GetAccount(address string) *AccountState {
-	s.mu.RLock()
+	s.RLock()
 	account, exists := s.accounts[address]
-	s.mu.RUnlock()
+	s.RUnlock()
 
 	if !exists {
 		s.Lock()
@@ -85,20 +85,18 @@ func (s *StateDB) GetBalance(address string) uint64 {
 
 // GetNonce 获取nonce
 func (s *StateDB) GetNonce(address string) uint64 {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
 	account := s.GetAccount(address)
 	confirmedNonce := account.Nonce
 
 	// 如果存在待处理状态，返回待处理的nonce
+	s.RLock()
+	defer s.RUnlock()
 	if pending, exists := s.pendingTxs[address]; exists {
 		pending.mu.RLock()
 		pendingNonce := pending.pendingNonce
 		pending.mu.RUnlock()
 		return pendingNonce
 	}
-
 	return confirmedNonce
 }
 
@@ -135,24 +133,21 @@ func (s *StateDB) ValidateTransaction(tx *types.Transaction, minGasPrice uint64)
 	// 获取或创建待处理状态
 	pending, exists := s.pendingTxs[tx.From]
 	if !exists {
+		// 检查发送方余额
+		sender.mu.RLock()
 		pending = &PendingState{
 			pendingBalance: sender.Balance,
 			pendingNonce:   sender.Nonce,
 		}
+		sender.mu.RUnlock()
 		s.pendingTxs[tx.From] = pending
 	}
-
-	pending.mu.Lock()
-	defer pending.mu.Unlock()
 
 	// 计算交易需要的总费用
 	gasFeeCost := tx.GasUsed * tx.GasPrice
 	totalCost := gasFeeCost + tx.Value
 
-	// 检查发送方余额
-	sender.mu.RLock()
-	defer sender.mu.RUnlock()
-
+	pending.mu.Lock()
 	// 检查待处理余额是否足够
 	if pending.pendingBalance < totalCost {
 		return fmt.Errorf("insufficient balance (including pending): has %d, needs %d",
@@ -162,7 +157,7 @@ func (s *StateDB) ValidateTransaction(tx *types.Transaction, minGasPrice uint64)
 	// 更新待处理状态
 	pending.pendingBalance -= totalCost
 	pending.pendingNonce++
-
+	pending.mu.Unlock()
 	return nil
 }
 
@@ -177,8 +172,8 @@ func (s *StateDB) ValidateTransactionForBlock(tx *types.Transaction, minGasPrice
 	}
 
 	sender := s.GetAccount(tx.From)
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.RLock()
+	defer s.RUnlock()
 
 	// 获取或创建待处理状态
 	pending, exists := s.pendingTxs[tx.From]
@@ -264,8 +259,8 @@ func (s *StateDB) ExecuteTransaction(tx *types.Transaction) error {
 
 // GetStateRoot 计算状态根哈希
 func (s *StateDB) GetStateRoot() string {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.RLock()
+	defer s.RUnlock()
 
 	// 将所有账户状态排序并序列化
 	data, err := json.Marshal(s.accounts)
@@ -329,10 +324,9 @@ func (s *StateDB) SetAccountPublicKey(address string, pubKey crypto.PubKey) erro
 
 // 获取公钥的方法
 func (s *StateDB) GetAccountPublicKey(address string) (crypto.PubKey, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
 	account := s.GetAccount(address)
+	s.RLock()
+	defer s.RUnlock()
 	account.mu.RLock()
 	pubKeyBytes := account.PublicKey
 	keyType := account.PublicKeyType
@@ -362,6 +356,17 @@ func (s *StateDB) Lock() {
 func (s *StateDB) Unlock() {
 	//fmt.Printf("Unlocking at: %s\n", getStackTrace())
 	s.mu.Unlock()
+}
+
+func (s *StateDB) RLock() {
+	//fmt.Printf("Attempting to acquire Rlock at: %s\n", getStackTrace())
+	s.mu.RLock()
+	//fmt.Printf("RLock acquired at: %s\n", getStackTrace())
+}
+
+func (s *StateDB) RUnlock() {
+	//fmt.Printf("RUnlocking at: %s\n", getStackTrace())
+	s.mu.RUnlock()
 }
 
 // 获取调用栈信息

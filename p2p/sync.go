@@ -708,7 +708,7 @@ func (n *Layer2Node) handleStateSync(msg *pubsub.Message) {
 	}
 
 	// 准备响应数据
-	n.stateDB.mu.RLock()
+	n.stateDB.RLock()
 	accounts := make(map[string]*AccountState)
 	for addr, state := range n.stateDB.accounts {
 		accounts[addr] = &AccountState{
@@ -726,7 +726,7 @@ func (n *Layer2Node) handleStateSync(msg *pubsub.Message) {
 		}
 		return true
 	})
-	n.stateDB.mu.RUnlock()
+	n.stateDB.RUnlock()
 
 	// 添加待处理状态信息
 	pendingStates := make(map[string]*PendingState)

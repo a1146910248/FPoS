@@ -35,6 +35,7 @@ func (n *Layer2Node) StartPeriodicTransaction() {
 		for {
 			select {
 			case <-n.ctx.Done():
+				logger.Error("定时交易退出")
 				return
 			case <-ticker.C:
 				//default:
@@ -262,22 +263,28 @@ func CalculateTxHash(tx *types.Transaction) (bool, error) {
 }
 
 func (n *Layer2Node) getRandomToPubKey() (string, error) {
-	n.stateDB.mu.RLock()
-	defer n.stateDB.mu.RUnlock()
-
-	// 获取所有账户地址
-	addresses := make([]string, 0)
+	// 先复制地址列表
+	n.stateDB.RLock()
+	addresses := make([]string, 0, len(n.stateDB.accounts))
 	for addr := range n.stateDB.accounts {
-		// 排除自己的地址
-		if pb, _ := types.PublicKeyToAddress(n.publicKey); addr != pb {
-			addresses = append(addresses, addr)
+		addresses = append(addresses, addr)
+	}
+	n.stateDB.RUnlock()
+
+	// 在无锁的情况下处理数据
+	filteredAddrs := make([]string, 0)
+	selfAddr, _ := types.PublicKeyToAddress(n.publicKey)
+	for _, addr := range addresses {
+		if addr != selfAddr {
+			filteredAddrs = append(filteredAddrs, addr)
 		}
 	}
-	if len(addresses) == 0 {
-		return "", fmt.Errorf("no other addresses available in  state")
+
+	if len(filteredAddrs) == 0 {
+		return "", fmt.Errorf("no other addresses available")
 	}
 
-	return addresses[rand.Intn(len(addresses))], nil
+	return filteredAddrs[rand.Intn(len(filteredAddrs))], nil
 }
 
 // 当交易从交易池移除时（超时或其他原因）

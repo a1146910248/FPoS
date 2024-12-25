@@ -55,8 +55,10 @@ func (s *Sequencer) watchRotation() {
 		s.mu.Lock()
 		// 当前节点被选上
 		if s.node.IsCurrentSequencer() {
+			s.node.mu.Lock()
 			s.node.isSequencer = true
 			s.node.sequencer = s
+			s.node.mu.Unlock()
 			addr, _ := types.PublicKeyToAddress(s.node.publicKey)
 			fmt.Printf("Node %s became the new sequencer\n", addr)
 		} else {
@@ -84,9 +86,9 @@ func (s *Sequencer) blockProducingLoop() {
 
 			if isCurrentSeq && s.shouldProduceBlock() {
 				// 一旦当选应该立即置否以防止连续出块
-				s.mu.Lock()
+				s.node.mu.Lock()
 				s.node.isSequencer = false
-				s.mu.Unlock()
+				s.node.mu.Unlock()
 				s.produceBlock()
 			}
 		}
