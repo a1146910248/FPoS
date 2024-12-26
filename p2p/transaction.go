@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/spf13/viper"
 	"math/rand"
 	"sort"
 	"time"
@@ -23,7 +24,8 @@ func (n *Layer2Node) StartPeriodicTransaction() {
 	n.mu.Unlock()
 
 	go func() {
-		ticker := time.NewTicker(50 * time.Millisecond)
+		interval := viper.GetInt("L2.TransactionInterval")
+		ticker := time.NewTicker(time.Duration(interval) * time.Millisecond)
 		defer ticker.Stop()
 
 		// 获取本节点的地址

@@ -64,6 +64,7 @@ type ElectionState struct {
 	MaxMissedBlocks  int                   // 允许的最大错过区块数
 	LastRandomNumber *big.Int              // 上一次使用的随机数
 	NextRotationTime time.Time             `json:"next_rotation_time"` // 新增：下次轮换时间
+	CurrentProposers []string              // 新增：当前的提案者列表
 }
 
 // ValidatorMessage 验证者消息类型

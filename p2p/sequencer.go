@@ -5,18 +5,21 @@ import (
 	"FPoS/core/consensus"
 	"FPoS/core/ethereum"
 	"FPoS/types"
+	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"sync"
 	"time"
 )
 
-const _MaxBlockGasLimit_ = 210000
+const _MaxBlockGasLimit_ = 2100
 
 type Sequencer struct {
 	node             *Layer2Node
 	blockHeight      uint64
 	mu               sync.Mutex
 	maxBlockGasLimit uint64
+	blockVoteChan    chan types.BlockVote
 
 	electionMgr *consensus.ElectionManager
 	ethClient   *ethereum.EthereumClient
@@ -36,6 +39,7 @@ func NewSequencer(node *Layer2Node, config *config.Config) (*Sequencer, error) {
 		//maxBlockGasLimit: 30_000_000, // 区块 gas 上限为 30,000,000
 		maxBlockGasLimit: _MaxBlockGasLimit_, // 区块 gas 上限为 30,000,000
 		ethClient:        ethClient,
+		blockVoteChan:    make(chan types.BlockVote, 2),
 	}
 	node.sequencer = seq
 	return seq, nil
@@ -171,6 +175,18 @@ func (s *Sequencer) produceBlock() {
 		return
 	}
 	block.Hash = blockHash
+	// 收集投票
+	err = s.PubVoteReq(block)
+	if err != nil {
+		return
+	}
+
+	for i := 0; i < 2; i++ {
+		select {
+		case vote := <-s.blockVoteChan:
+			block.Votes = append(block.Votes, vote)
+		}
+	}
 
 	// 提交区块到L1
 	go func() {
@@ -188,4 +204,27 @@ func (s *Sequencer) produceBlock() {
 
 	fmt.Printf("New block produced: height=%d, txs=%d, gasUsed=%d\n",
 		block.Height, len(block.Transactions), totalGas)
+}
+
+func (s *Sequencer) PubVoteReq(block types.Block) error {
+	requestID := uuid.New().String()
+	s.node.currentBlockVoteRequestID = requestID
+	address, _ := types.PublicKeyToAddress(s.node.publicKey)
+	req := BlockVoteReq{
+		Type:      BlockVoteRequest,
+		RequestID: requestID,
+		Address:   address,
+		Block:     block,
+	}
+	data, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("failed to marshal tx sync request: %w", err)
+	}
+
+	// 发布同步请求
+	if err := s.node.topic.blockVoteTopic.Publish(s.node.ctx, data); err != nil {
+		return fmt.Errorf("failed to publish tx sync request: %w", err)
+	}
+	logger.Info("等待收集投票")
+	return nil
 }

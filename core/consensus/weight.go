@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"math/big"
+	"sort"
 	"time"
 )
 
@@ -91,7 +92,11 @@ func (em *ElectionManager) RotateSequencer() {
 	}
 
 	var weights []bucketWeight
-
+	// 人数不够共识，则等待下一轮
+	if len(activeValidators) < 3 {
+		fmt.Printf("validators number to low")
+		return
+	}
 	// 计算所有桶的权重
 	for _, v := range activeValidators {
 		for _, bucket := range v.Buckets {
@@ -101,50 +106,116 @@ func (em *ElectionManager) RotateSequencer() {
 				bucket:    bucket,
 				weight:    newWeight,
 			})
+			bucket.CurrentWeight = newWeight
 		}
 	}
 
-	// 找出权重最大的桶
-	var maxWeight *big.Int
-	var selectedBucket *StakeBucket
-	var selectedValidator *Validator
+	// 按权重排序
+	sort.Slice(weights, func(i, j int) bool {
+		return weights[i].weight.Cmp(weights[j].weight) > 0
+	})
 
+	// 选择前三个最高权重的提案者
+	selectedProposers := make(map[string]struct{})
+	var topProposers []struct {
+		validator *Validator
+		bucket    *StakeBucket
+		weight    *big.Int
+	}
+
+	// 确保不会选择同一个验证者多次
 	for _, bw := range weights {
-		// 更新为新的weight值
-		bw.bucket.CurrentWeight = bw.weight
-		if maxWeight == nil || bw.weight.Cmp(maxWeight) > 0 {
-			maxWeight = bw.weight
-			selectedBucket = bw.bucket
-			selectedValidator = bw.validator
+		if len(topProposers) >= 3 {
+			break
+		}
+		// 检查这个验证者是否已经被选中
+		if _, exists := selectedProposers[bw.validator.Address]; !exists {
+			topProposers = append(topProposers, struct {
+				validator *Validator
+				bucket    *StakeBucket
+				weight    *big.Int
+			}{
+				validator: bw.validator,
+				bucket:    bw.bucket,
+				weight:    bw.weight,
+			})
+			selectedProposers[bw.validator.Address] = struct{}{}
 		}
 	}
 
-	// 重置选中的桶权重，其他桶权重保持不变
-	selectedBucket.CurrentWeight = big.NewInt(0)
+	// 重置选中的桶权重
+	for _, proposer := range topProposers {
+		proposer.bucket.CurrentWeight = big.NewInt(0)
+	}
+
+	//// 找出权重最大的桶
+	//var maxWeight *big.Int
+	//var selectedBucket *StakeBucket
+	//var selectedValidator *Validator
+	//
+	//for _, bw := range weights {
+	//	// 更新为新的weight值
+	//	bw.bucket.CurrentWeight = bw.weight
+	//	if maxWeight == nil || bw.weight.Cmp(maxWeight) > 0 {
+	//		maxWeight = bw.weight
+	//		selectedBucket = bw.bucket
+	//		selectedValidator = bw.validator
+	//	}
+	//}
+	//
+	//// 重置选中的桶权重，其他桶权重保持不变
+	//selectedBucket.CurrentWeight = big.NewInt(0)
 
 	// 更新状态
 	now := time.Now()
-	em.state.CurrentSequencer = selectedValidator.Address
+	//em.state.CurrentSequencer = selectedValidator.Address
 	em.state.CurrentTerm++
 	em.state.LastRotation = now
 	em.state.LastRandomNumber = fullRandom
 	em.state.NextRotationTime = now.Add(em.state.RotationInterval)
 
-	fmt.Printf("New sequencer selected: %s (term=%d)\n"+
-		"Bucket ID: %d\n"+
-		"Bucket Stake: %d\n"+
-		"Final Weight: %s\n"+
-		"Next rotation at: %s\n",
-		selectedValidator.Address,
-		em.state.CurrentTerm,
-		selectedBucket.ID,
-		selectedBucket.StakeAmount,
-		maxWeight.String(),
-		em.state.NextRotationTime.Format(time.RFC3339),
-	)
+	// 更新提案者列表
+	em.state.CurrentProposers = make([]string, len(topProposers))
+	for i, p := range topProposers {
+		em.state.CurrentProposers[i] = p.validator.Address
+	}
+
+	// 主排序器为权重最高的提案者
+	em.state.CurrentSequencer = topProposers[0].validator.Address
+
+	//fmt.Printf("New sequencer selected: %s (term=%d)\n"+
+	//	"Bucket ID: %d\n"+
+	//	"Bucket Stake: %d\n"+
+	//	"Final Weight: %s\n"+
+	//	"Next rotation at: %s\n",
+	//	selectedValidator.Address,
+	//	em.state.CurrentTerm,
+	//	selectedBucket.ID,
+	//	selectedBucket.StakeAmount,
+	//	maxWeight.String(),
+	//	em.state.NextRotationTime.Format(time.RFC3339),
+	//)
+
+	// 打印选举结果
+	fmt.Printf("New proposers selected for term %d:\n", em.state.CurrentTerm)
+	for i, p := range topProposers {
+		fmt.Printf("Proposer %d:\n"+
+			"  Address: %s\n"+
+			"  Bucket ID: %d\n"+
+			"  Bucket Stake: %d\n"+
+			"  Weight: %s\n",
+			i+1,
+			p.validator.Address,
+			p.bucket.ID,
+			p.bucket.StakeAmount,
+			p.weight.String(),
+		)
+	}
+	fmt.Printf("Next rotation at: %s\n",
+		em.state.NextRotationTime.Format(time.RFC3339))
 
 	select {
-	case em.rotationCh <- selectedValidator.Address:
+	case em.rotationCh <- em.state.CurrentSequencer:
 	default:
 	}
 }

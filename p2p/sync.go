@@ -26,6 +26,8 @@ const (
 	SyncChunk
 	TxSyncRequest
 	TxSyncResponse
+	BlockVoteRequest
+	BlockVoteResponse
 )
 
 type StateChunk struct {
@@ -77,12 +79,20 @@ func (n *Layer2Node) setupTopics() error {
 	}
 	n.topic.txStatTopic = txStatTopic
 
+	// 添加区块投票 topic
+	blockVoteTopic, err := n.pubsub.Join("l2_block_vote")
+	if err != nil {
+		return err
+	}
+	n.topic.blockVoteTopic = blockVoteTopic
+
 	go n.handleTxMessages()
 	go n.handleBlockMessages()
 	go n.handleStateMessages()
 	go n.handleTxSyncMessages()
 	go n.handleValidatorSyncMessage()
 	go n.handleTxStatMessage()
+	go n.handleBlockVoteMessage()
 
 	return nil
 }
@@ -368,6 +378,49 @@ func (n *Layer2Node) handleTxStatMessage() {
 		for _, tx := range txs {
 			// 更新交易历史
 			n.txHistory.Store(tx.Hash, tx)
+		}
+	}
+}
+
+func (n *Layer2Node) handleBlockVoteMessage() {
+	sub, err := n.topic.blockVoteTopic.Subscribe()
+	if err != nil {
+		return
+	}
+
+	for {
+		msg, err := sub.Next(n.ctx)
+		if err != nil {
+			fmt.Printf("Error receiving message: %v\n", err)
+			continue
+		}
+
+		// 忽略自己发送的消息
+		if msg.ReceivedFrom == n.host.ID() {
+			continue
+		}
+
+		var msgType struct {
+			Type MessageType `json:"type"`
+		}
+		if err := json.Unmarshal(msg.Data, &msgType); err != nil {
+			continue
+		}
+
+		switch msgType.Type {
+		case BlockVoteRequest:
+			n.handleBlockVoteRequest(msg)
+
+		case BlockVoteResponse:
+			var resp BlockVoteRsp
+			if err := json.Unmarshal(msg.Data, &resp); err != nil {
+				continue
+			}
+			// 检查是否是发给自己的响应
+			if resp.RequestID == n.currentBlockVoteRequestID {
+				// 使用通道通知
+				n.sequencer.blockVoteChan <- resp.BlockVote
+			}
 		}
 	}
 }

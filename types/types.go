@@ -54,7 +54,18 @@ type Block struct {
 	Proposer     string        `json:"proposer"`
 	GasUsed      uint64        `json:"gasUsed"`  // 区块中所有交易消耗的总gas
 	GasLimit     uint64        `json:"gasLimit"` // 区块gas上限
+	Votes        []BlockVote   `json:"votes"`
 	Signature    []byte        `json:"signature"`
+}
+
+// 投票结构
+type BlockVote struct {
+	BlockHash    string    `json:"block_hash"`
+	BlockHeight  uint64    `json:"block_height"`
+	Approve      bool      `json:"approve"`
+	VoterAddress string    `json:"voter_address"`
+	Signature    []byte    `json:"signature"`
+	Timestamp    time.Time `json:"timestamp"`
 }
 
 // 状态同步请求

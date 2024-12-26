@@ -40,34 +40,35 @@ func GetNode() *Layer2Node {
 }
 
 type Layer2Node struct {
-	host                 host.Host
-	dht                  *dht.IpfsDHT
-	pubsub               *pubsub.PubSub
-	ctx                  context.Context
-	topic                P2PTopic
-	blockCache           *sync.Map
-	txPool               *sync.Map
-	txCountMu            sync.RWMutex
-	txCount              uint64    //交易数量统计
-	txHistory            *sync.Map // 存储所有历史交易
-	txHistoryMu          sync.RWMutex
-	stateRoot            string
-	latestBlock          uint64
-	handlers             types.Handlers
-	pingService          *ping.PingService
-	bootstrapPeers       []string
-	mu                   sync.RWMutex
-	privateKey           crypto.PrivKey
-	publicKey            crypto.PubKey
-	minGasPrice          uint64
-	isSequencer          bool
-	sequencer            *Sequencer
-	currentSyncRequestID string // 当前交易同步请求ID
-	isSyncing            bool
-	initialized          bool
-	stateDB              *StateDB
-	electionMgr          *consensus.ElectionManager
-	periodicTxStarted    bool
+	host                      host.Host
+	dht                       *dht.IpfsDHT
+	pubsub                    *pubsub.PubSub
+	ctx                       context.Context
+	topic                     P2PTopic
+	blockCache                *sync.Map
+	txPool                    *sync.Map
+	txCountMu                 sync.RWMutex
+	txCount                   uint64    //交易数量统计
+	txHistory                 *sync.Map // 存储所有历史交易
+	txHistoryMu               sync.RWMutex
+	stateRoot                 string
+	latestBlock               uint64
+	handlers                  types.Handlers
+	pingService               *ping.PingService
+	bootstrapPeers            []string
+	mu                        sync.RWMutex
+	privateKey                crypto.PrivKey
+	publicKey                 crypto.PubKey
+	minGasPrice               uint64
+	isSequencer               bool
+	sequencer                 *Sequencer
+	currentSyncRequestID      string // 当前交易同步请求ID
+	currentBlockVoteRequestID string // 区块投票请求ID
+	isSyncing                 bool
+	initialized               bool
+	stateDB                   *StateDB
+	electionMgr               *consensus.ElectionManager
+	periodicTxStarted         bool
 }
 
 type P2PTopic struct {
@@ -77,6 +78,7 @@ type P2PTopic struct {
 	txSyncTopic    *pubsub.Topic
 	validatorTopic *pubsub.Topic
 	txStatTopic    *pubsub.Topic
+	blockVoteTopic *pubsub.Topic
 }
 
 const pubsubMaxSize = 1 << 22 // 4 MB

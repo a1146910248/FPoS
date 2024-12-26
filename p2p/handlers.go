@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"time"
 
 	"github.com/google/uuid"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -160,6 +161,63 @@ func (n *Layer2Node) defaultBlockValidation(block Block, isHistoricalBlock bool)
 	if block.Proposer == "" || len(block.Signature) == 0 {
 		return false
 	}
+	if len(block.Votes) != 2 {
+		return false
+	}
+	err := VerifyBlockSignature(&block, n)
+	if err != nil {
+		return false
+	}
+	return true
+}
+
+func (n *Layer2Node) BlockVoteValidation(block Block, isHistoricalBlock bool) bool {
+	n.mu.RLock()
+	currentHeight := n.latestBlock
+	n.mu.RUnlock()
+
+	// 检查block hash
+	if hash, err := CalculateBlockHash(&block); hash != block.Hash || err != nil {
+		fmt.Printf("Block Hash invalid: current=%s, real=%s\n",
+			block.Hash, hash)
+		return false
+	}
+	// 只有非历史区块才检查高度必须大于当前高度
+	if !isHistoricalBlock && block.Height <= currentHeight {
+		fmt.Printf("Block height invalid: current=%d, new=%d\n",
+			currentHeight, block.Height)
+		return false
+	}
+
+	// 检查区块连续性
+	previousBlock, exists := n.blockCache.Load(block.Height - 1)
+	if exists {
+		if prev, ok := previousBlock.(Block); ok {
+			if prev.Hash != block.PreviousHash {
+				return false
+			}
+		}
+	}
+
+	// 验证交易默克尔根
+	if calculateTxRoot := CalculateMerkleRoot(block.Transactions); calculateTxRoot != block.TxRoot {
+		fmt.Printf("Transaction merker verification failed\n")
+	}
+
+	if block.Timestamp.IsZero() {
+		return false
+	}
+
+	// 验证每笔交易，是否是同步分开
+	for _, tx := range block.Transactions {
+		if !n.validateTxForBlock(&tx, isHistoricalBlock, block.Proposer) {
+			return false
+		}
+	}
+
+	if block.Proposer == "" || len(block.Signature) == 0 {
+		return false
+	}
 	err := VerifyBlockSignature(&block, n)
 	if err != nil {
 		return false
@@ -261,6 +319,9 @@ func (n *Layer2Node) validateBlockInternal(block Block, isHistoricalBlock bool) 
 	}
 
 	if block.Proposer == "" || len(block.Signature) == 0 {
+		return false
+	}
+	if len(block.Votes) != 2 {
 		return false
 	}
 	err := VerifyBlockSignature(&block, n)
@@ -371,4 +432,121 @@ func (n *Layer2Node) handleTxSyncResponse(msg *pubsub.Message) {
 				tx.From, tx.Nonce)
 		}
 	}
+}
+
+// 区块投票请求结构
+type BlockVoteReq struct {
+	Type      MessageType `json:"type"`
+	RequestID string      `json:"request_id"`
+	Address   string      `json:"address"`
+	Block     Block       `json:"block"`
+}
+
+// 区块投票响应结构
+type BlockVoteRsp struct {
+	Type      MessageType `json:"type"`
+	RequestID string      `json:"request_id"`
+	Address   string      `json:"address"`
+	BlockVote BlockVote   `json:"block_vote"`
+}
+
+// 处理区块投票请求
+func (n *Layer2Node) handleBlockVoteRequest(msg *pubsub.Message) {
+	var req BlockVoteReq
+	var vote BlockVote
+	var err error
+	if err = json.Unmarshal(msg.Data, &req); err != nil {
+		return
+	}
+	// 如果自己不是是其他提案者，则不需要投票
+	address, err := PublicKeyToAddress(n.publicKey)
+	if err != nil {
+		return
+	}
+	if !n.electionMgr.IsProposer(address) || address == req.Block.Proposer {
+		return
+	}
+
+	if n.BlockVoteValidation(req.Block, false) {
+		vote, err = n.createBlockVote(req.Block, true)
+	} else {
+		vote, err = n.createBlockVote(req.Block, false)
+	}
+	if err != nil {
+		return
+	}
+
+	// 发送响应
+	resp := BlockVoteRsp{
+		Type:      BlockVoteResponse,
+		RequestID: req.RequestID,
+		Address:   req.Address,
+		BlockVote: vote,
+	}
+
+	data, err := json.Marshal(resp)
+	if err != nil {
+		return
+	}
+	n.topic.blockVoteTopic.Publish(n.ctx, data)
+	logger.Info("已发送投票")
+}
+
+// 创建区块投票
+func (n *Layer2Node) createBlockVote(block Block, isValid bool) (BlockVote, error) {
+	addr, err := PublicKeyToAddress(n.publicKey)
+	if err != nil {
+		logger.Error("Failed to get address.")
+		return BlockVote{}, err
+	}
+	vote := BlockVote{
+		BlockHash:    block.Hash,
+		BlockHeight:  block.Height,
+		Approve:      isValid,
+		VoterAddress: addr,
+		Timestamp:    time.Now(),
+	}
+
+	// 签名投票
+	err = SignBlockVote(&vote, n)
+	if err != nil {
+		return BlockVote{}, err
+	}
+	if err != nil {
+		logger.Errorf("Failed to sign vote: %v", err)
+		return BlockVote{}, err
+	}
+
+	return vote, nil
+}
+
+func SignBlockVote(vote *BlockVote, node *Layer2Node) error {
+	// 序列化区块数据
+	voteData := struct {
+		BlockHash    string
+		BlockHeight  uint64
+		Approve      bool
+		VoterAddress string
+		Timestamp    time.Time
+	}{
+		BlockHash:    vote.BlockHash,
+		BlockHeight:  vote.BlockHeight,
+		Approve:      vote.Approve,
+		VoterAddress: vote.VoterAddress,
+		Timestamp:    vote.Timestamp,
+	}
+
+	data, err := json.Marshal(voteData)
+	if err != nil {
+		return fmt.Errorf("failed to marshal block: %w", err)
+	}
+
+	// 使用节点私钥签名
+	signature, err := node.privateKey.Sign(data)
+	if err != nil {
+		return fmt.Errorf("failed to sign block: %w", err)
+	}
+
+	vote.Signature = signature
+	return nil
 }
