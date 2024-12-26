@@ -2,4 +2,4 @@ pkg
 .DS_Store
 .idea
 .vscode
-*.log
+log/*.log
