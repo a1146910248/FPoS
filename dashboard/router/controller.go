@@ -27,17 +27,23 @@ func (t HttpController) GetStats(c *gin.Context) {
 	stats := p2p.GetStats()
 	l1Blocks, l1Balance := stats.GetL1Stats()
 	l2Blocks, l2TPS := stats.GetL2Stats()
+	// 获取验证者统计信息
+	validatorCount, activeValidatorCount, currentSequencer, currentProposers := stats.GetValidatorStats()
 
 	chainStats := ChainStats{
-		CurrentTPS:  stats.GetCurrentTPS(),
-		PeakTPS:     stats.GetPeakTPS(),
-		TotalTx:     stats.GetTotalTransactions(),
-		BlockHeight: stats.GetCurrentHeight(),
-		ActiveUsers: stats.GetActiveUsers(),
-		L1Blocks:    l1Blocks,
-		L2Blocks:    l2Blocks,
-		L1Balance:   l1Balance,
-		L2TPS:       l2TPS,
+		CurrentTPS:           stats.GetCurrentTPS(),
+		PeakTPS:              stats.GetPeakTPS(),
+		TotalTx:              stats.GetTotalTransactions(),
+		BlockHeight:          stats.GetCurrentHeight(),
+		ActiveUsers:          stats.GetActiveUsers(),
+		L1Blocks:             l1Blocks,
+		L2Blocks:             l2Blocks,
+		L1Balance:            l1Balance,
+		L2TPS:                l2TPS,
+		ValidatorCount:       validatorCount,
+		ActiveValidatorCount: activeValidatorCount,
+		CurrentSequencer:     currentSequencer,
+		CurrentProposers:     currentProposers,
 	}
 
 	Success(c, chainStats)
@@ -147,17 +153,23 @@ func (t HttpController) StreamUpdates(c *gin.Context) {
 			stats := p2p.GetStats()
 			l1Blocks, l1Balance := stats.GetL1Stats()
 			l2Blocks, l2TPS := stats.GetL2Stats()
+			// 获取验证者统计信息
+			validatorCount, activeValidatorCount, currentSequencer, currentProposers := stats.GetValidatorStats()
 
 			chainStats := ChainStats{
-				CurrentTPS:  stats.GetCurrentTPS(),
-				PeakTPS:     stats.GetPeakTPS(),
-				TotalTx:     stats.GetTotalTransactions(),
-				BlockHeight: stats.GetCurrentHeight(),
-				ActiveUsers: stats.GetActiveUsers(),
-				L1Blocks:    l1Blocks,
-				L2Blocks:    l2Blocks,
-				L1Balance:   l1Balance,
-				L2TPS:       l2TPS,
+				CurrentTPS:           stats.GetCurrentTPS(),
+				PeakTPS:              stats.GetPeakTPS(),
+				TotalTx:              stats.GetTotalTransactions(),
+				BlockHeight:          stats.GetCurrentHeight(),
+				ActiveUsers:          stats.GetActiveUsers(),
+				L1Blocks:             l1Blocks,
+				L2Blocks:             l2Blocks,
+				L1Balance:            l1Balance,
+				L2TPS:                l2TPS,
+				ValidatorCount:       validatorCount,
+				ActiveValidatorCount: activeValidatorCount,
+				CurrentSequencer:     currentSequencer,
+				CurrentProposers:     currentProposers,
 			}
 
 			// 发送更新

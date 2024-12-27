@@ -218,6 +218,24 @@ func (em *ElectionManager) RotateSequencer() {
 	case em.rotationCh <- em.state.CurrentSequencer:
 	default:
 	}
+
+	// 计算活跃验证者数量
+	activeCount := uint64(0)
+	for _, v := range em.Validators {
+		if v.Status == Active {
+			activeCount++
+		}
+	}
+
+	// 通知状态变更
+	if em.onStateChange != nil {
+		em.onStateChange(
+			em.state.CurrentSequencer,
+			em.state.CurrentProposers,
+			uint64(len(em.Validators)),
+			activeCount,
+		)
+	}
 }
 
 // calculateBucketWeight 计算单个桶的新权重

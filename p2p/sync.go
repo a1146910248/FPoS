@@ -188,9 +188,8 @@ func (n *Layer2Node) handleTxMessages() {
 				stats := GetStats()
 				stats.UpdateActiveUser(tx.From)
 				stats.UpdateActiveUser(tx.To)
-				fmt.Printf("Processed transaction directly: from=%s, nonce=%d\n",
-					tx.From, tx.Nonce)
-				//n.BroadcastTransaction(tx)
+				//fmt.Printf("Processed transaction directly: from=%s, nonce=%d\n",
+				//	tx.From, tx.Nonce)
 			}
 		}
 	}
@@ -315,9 +314,14 @@ func (n *Layer2Node) handleTxSyncMessages() {
 				continue
 			}
 			// 检查是否是发给自己的响应
-			if resp.RequestID == n.currentSyncRequestID {
+			n.mu.RLock()
+			nodeCurrentSyncRequestID := n.currentSyncRequestID
+			n.mu.RUnlock()
+
+			if resp.RequestID == nodeCurrentSyncRequestID {
 				n.handleTxSyncResponse(msg)
 			}
+
 		}
 	}
 }
@@ -368,7 +372,7 @@ func (n *Layer2Node) handleTxStatMessage() {
 		}
 
 		// 添加日志以调试消息接收
-		fmt.Printf("Received validator message from: %s\n", msg.ReceivedFrom)
+		fmt.Printf("Received validator message for sync state from: %s\n", msg.ReceivedFrom)
 
 		var txs []Transaction
 		if err := json.Unmarshal(msg.Data, &txs); err != nil {
@@ -417,10 +421,12 @@ func (n *Layer2Node) handleBlockVoteMessage() {
 				continue
 			}
 			// 检查是否是发给自己的响应
+			n.mu.RLock()
 			if resp.RequestID == n.currentBlockVoteRequestID {
 				// 使用通道通知
 				n.sequencer.blockVoteChan <- resp.BlockVote
 			}
+			n.mu.RUnlock()
 		}
 	}
 }

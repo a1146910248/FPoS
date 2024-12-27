@@ -4,8 +4,6 @@ import (
 	. "FPoS/types"
 	"encoding/json"
 	"fmt"
-	"os"
-	"sort"
 	"time"
 
 	"github.com/google/uuid"
@@ -75,26 +73,22 @@ func (n *Layer2Node) defaultTxValidation(tx *Transaction) bool {
 			currentNonce, tx.Nonce)
 
 		// 触发交易同步
-		if os.Getenv("BOOTSTRAP") != "true" {
-			go func() {
-				n.mu.Lock()
-				if n.isSyncing {
-					n.mu.Unlock()
-					return
-				}
-				n.isSyncing = true
+		go func() {
+			n.mu.Lock()
+			if n.isSyncing {
 				n.mu.Unlock()
+				return
+			}
+			// 在接收到响应并且装载完后再解除锁定
+			n.isSyncing = true
+			n.mu.Unlock()
 
-				// 请求缺失的交易
-				if err := n.syncMissingTransactions(tx.From, currentNonce+1, tx.Nonce); err != nil {
-					fmt.Printf("Missing transactions sync failed: %v\n", err)
-				}
+			// 请求缺失的交易
+			if err := n.syncMissingTransactions(tx.From, currentNonce+1, tx.Nonce); err != nil {
+				fmt.Printf("Missing transactions sync failed: %v\n", err)
+			}
 
-				n.mu.Lock()
-				n.isSyncing = false
-				n.mu.Unlock()
-			}()
-		}
+		}()
 		return false
 	} else if tx.Nonce < currentNonce+1 {
 		fmt.Printf("Transaction nonce too low: expected %d, got %d\n",
@@ -240,6 +234,17 @@ func (n *Layer2Node) validateTxForBlock(tx *Transaction, isHistoricalBlock bool,
 				return false
 			}
 		} else {
+			// 等待初始化和同步完成,未完全同步会导致找不到对应交易
+			for {
+				n.mu.RLock()
+				isSyncing := n.isSyncing
+				n.mu.RUnlock()
+
+				if !isSyncing {
+					break
+				}
+				time.Sleep(100 * time.Millisecond)
+			}
 			if _, exists := n.txPool.Load(tx.Hash); !exists {
 				fmt.Println("本节点为非排序器节点，但交易池中未含有该交易")
 				return false
@@ -342,16 +347,32 @@ type TxSyncReq struct {
 
 // 交易同步响应结构
 type TxSyncRsp struct {
-	Type         MessageType   `json:"type"`
-	RequestID    string        `json:"request_id"`
-	Address      string        `json:"address"`
-	Transactions []Transaction `json:"transactions"`
+	Type         MessageType  `json:"type"`
+	RequestID    string       `json:"request_id"`
+	Address      string       `json:"address"`
+	Transactions []TxWithMeta `json:"transactions"`
 }
+
+// 添加交易元数据
+type TxWithMeta struct {
+	Transaction Transaction `json:"transaction"`
+	Source      TxSource    `json:"source"` // 交易来源
+}
+
+// 交易来源
+type TxSource string
+
+const (
+	TxSourcePool    TxSource = "pool"    // 来自交易池
+	TxSourceHistory TxSource = "history" // 来自历史记录
+)
 
 // 同步缺失的交易
 func (n *Layer2Node) syncMissingTransactions(address string, fromNonce, toNonce uint64) error {
 	requestID := uuid.New().String()
+	n.mu.Lock()
 	n.currentSyncRequestID = requestID // 记录当前请求ID
+	n.mu.Unlock()
 
 	req := TxSyncReq{
 		Type:      TxSyncRequest,
@@ -383,23 +404,81 @@ func (n *Layer2Node) handleTxSyncRequest(msg *pubsub.Message) {
 		return
 	}
 
+	// 用 map 收集交易，确保不重复
+	txMap := make(map[uint64]TxWithMeta)
+	missingNonces := make(map[uint64]bool)
+
+	// 初始化需要的 nonce 列表
+	for nonce := req.FromNonce; nonce <= req.ToNonce; nonce++ {
+		missingNonces[nonce] = true
+	}
+
 	// 收集请求范围内的交易
-	var transactions []Transaction
 	n.txPool.Range(func(_, value interface{}) bool {
 		if tx, ok := value.(Transaction); ok {
 			if tx.From == req.Address &&
 				tx.Nonce >= req.FromNonce &&
 				tx.Nonce <= req.ToNonce {
-				transactions = append(transactions, tx)
+				txMap[tx.Nonce] = TxWithMeta{
+					Transaction: tx,
+					Source:      TxSourcePool,
+				}
+				delete(missingNonces, tx.Nonce)
 			}
 		}
 		return true
 	})
+	// 从历史记录中收集缺失的交易
+	if len(missingNonces) > 0 {
+		// 首先收集该地址的所有历史交易hash
+		addrTxs := make(map[string]struct{})
+		n.txHistory.Range(func(key, value interface{}) bool {
+			if tx, ok := value.(Transaction); ok {
+				if tx.From == req.Address {
+					addrTxs[key.(string)] = struct{}{}
+				}
+			}
+			return true
+		})
 
-	// 按 nonce 排序
-	sort.Slice(transactions, func(i, j int) bool {
-		return transactions[i].Nonce < transactions[j].Nonce
-	})
+		// 再次遍历找到缺失的nonce
+		n.txHistory.Range(func(key, value interface{}) bool {
+			if _, exists := addrTxs[key.(string)]; exists {
+				if tx, ok := value.(Transaction); ok {
+					if _, missing := missingNonces[tx.Nonce]; missing {
+						txMap[tx.Nonce] = TxWithMeta{
+							Transaction: tx,
+							Source:      TxSourceHistory,
+						}
+						delete(missingNonces, tx.Nonce)
+					}
+				}
+			}
+			// 如果已经找到所有缺失的nonce，可以提前结束遍历
+			if len(missingNonces) == 0 {
+				return false
+			}
+			return true
+		})
+
+		// 检查是否找到所有缺失的交易
+		if len(missingNonces) > 0 {
+			logger.Infof("Incomplete transaction sequence for address %s",
+				req.Address)
+			return
+		}
+	}
+
+	// 将 map 转换为有序数组
+	transactions := make([]TxWithMeta, 0, req.ToNonce-req.FromNonce+1)
+	for nonce := req.FromNonce; nonce <= req.ToNonce; nonce++ {
+		txMeta, exists := txMap[nonce]
+		if !exists {
+			logger.Errorf("Unexpected missing transaction for nonce %d", nonce)
+			return
+		}
+		transactions = append(transactions, txMeta)
+	}
 
 	// 发送响应
 	resp := TxSyncRsp{
@@ -426,12 +505,22 @@ func (n *Layer2Node) handleTxSyncResponse(msg *pubsub.Message) {
 
 	// 按顺序处理交易
 	for _, tx := range resp.Transactions {
-		if n.validateTransaction(tx) {
-			n.txPool.Store(tx.Hash, tx)
+		if n.validateTransaction(tx.Transaction) {
+			// 只有当前在交易池中的才加入，否则加入到历史池子中，不然会导致当选排序器时重复消费
+			if tx.Source == TxSourcePool {
+				n.txPool.Store(tx.Transaction.Hash, tx.Transaction)
+			} else {
+				n.txHistory.Store(tx.Transaction.Hash, tx.Transaction)
+			}
 			fmt.Printf("Synced missing transaction: from=%s, nonce=%d\n",
-				tx.From, tx.Nonce)
+				tx.Transaction.From, tx.Transaction.Nonce)
 		}
 	}
+	// 如果完美解决
+	n.mu.Lock()
+	n.isSyncing = false
+	n.currentSyncRequestID = ""
+	n.mu.Unlock()
 }
 
 // 区块投票请求结构

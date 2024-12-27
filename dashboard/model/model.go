@@ -7,15 +7,19 @@ import (
 
 // 链状态
 type ChainStats struct {
-	CurrentTPS  float64  `json:"current_tps"`
-	PeakTPS     float64  `json:"peak_tps"`
-	TotalTx     uint64   `json:"total_tx"`
-	BlockHeight uint64   `json:"block_height"`
-	ActiveUsers uint64   `json:"active_users"`
-	L1Blocks    uint64   `json:"l1_blocks"`
-	L2Blocks    uint64   `json:"l2_blocks"`
-	L1Balance   *big.Int `json:"l1_balance"`
-	L2TPS       float64  `json:"l2_tps"`
+	CurrentTPS           float64  `json:"current_tps"`
+	PeakTPS              float64  `json:"peak_tps"`
+	TotalTx              uint64   `json:"total_tx"`
+	BlockHeight          uint64   `json:"block_height"`
+	ActiveUsers          uint64   `json:"active_users"`
+	L1Blocks             uint64   `json:"l1_blocks"`
+	L2Blocks             uint64   `json:"l2_blocks"`
+	L1Balance            *big.Int `json:"l1_balance"`
+	L2TPS                float64  `json:"l2_tps"`
+	ValidatorCount       uint64   `json:"validator_count"`
+	ActiveValidatorCount uint64   `json:"active_validator_count"`
+	CurrentSequencer     string   `json:"current_sequencer"`
+	CurrentProposers     []string `json:"current_proposers"`
 }
 
 // TransactionList 交易列表响应结构

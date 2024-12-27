@@ -27,6 +27,9 @@ type ElectionManager struct {
 	rotationCh chan string
 	ctx        context.Context
 	cancel     context.CancelFunc
+
+	// 事件回调
+	onStateChange func(sequencer string, proposers []string, totalValidators uint64, activeValidators uint64)
 }
 
 func NewElectionManager(ctx context.Context, config *ConsensusConfig) *ElectionManager {
@@ -62,6 +65,11 @@ func (em *ElectionManager) SetState(state *ElectionState) {
 	em.mu.Lock()
 	defer em.mu.Unlock()
 	em.state = state
+}
+
+// 设置状态变更回调
+func (em *ElectionManager) SetStateChangeCallback(callback func(string, []string, uint64, uint64)) {
+	em.onStateChange = callback
 }
 
 func (em *ElectionManager) Start() {

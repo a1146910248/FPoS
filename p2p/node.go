@@ -355,18 +355,6 @@ func (n *Layer2Node) Start() error {
 	// 寻找网络中的其他节点
 	go n.discoverPeers()
 
-	// 如果是验证者节点，初始化共识
-	if len(n.bootstrapPeers) > 0 {
-		consensusConfig := &consensus.ConsensusConfig{
-			MinStakeAmount:   1000000,
-			RotationInterval: 60 * time.Second,
-			ValidatorQuorum:  3,
-		}
-		time.Sleep(2 * time.Second)
-		if err := n.InitConsensus(consensusConfig); err != nil {
-			panic(err)
-		}
-	}
 	// 启动状态监听
 	go n.watchTxStatus()
 
@@ -374,6 +362,18 @@ func (n *Layer2Node) Start() error {
 	if len(n.bootstrapPeers) > 0 {
 		if err := n.syncStateFromPeers(); err != nil {
 			fmt.Printf("Failed to sync state from peers: %s\n", err)
+		}
+	}
+	// 如果是验证者节点，初始化共识
+	if len(n.bootstrapPeers) > 0 {
+		consensusConfig := &consensus.ConsensusConfig{
+			MinStakeAmount:   1000000,
+			RotationInterval: 60 * time.Second,
+			ValidatorQuorum:  3,
+		}
+		//time.Sleep(2 * time.Second)
+		if err := n.InitConsensus(consensusConfig); err != nil {
+			panic(err)
 		}
 	}
 	return nil

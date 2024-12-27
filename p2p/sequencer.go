@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const _MaxBlockGasLimit_ = 2100
+const _MaxBlockGasLimit_ = 810000
 
 type Sequencer struct {
 	node             *Layer2Node
@@ -208,7 +208,9 @@ func (s *Sequencer) produceBlock() {
 
 func (s *Sequencer) PubVoteReq(block types.Block) error {
 	requestID := uuid.New().String()
+	s.node.mu.Lock()
 	s.node.currentBlockVoteRequestID = requestID
+	s.node.mu.Unlock()
 	address, _ := types.PublicKeyToAddress(s.node.publicKey)
 	req := BlockVoteReq{
 		Type:      BlockVoteRequest,

@@ -8,6 +8,11 @@ export interface StatsResp {
   l2_blocks:number
   l1_balance:string
   l2_tps:number
+
+  validator_count: number;      // 总验证者数量
+  active_validator_count: number;  // 活跃验证者数量
+  current_sequencer: string;    // 当前排序器地址
+  current_proposers: string[];  // 当前提案者列表(包含排序器)
 }
 
 export interface Transaction {

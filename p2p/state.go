@@ -15,6 +15,7 @@ import (
 type AccountState struct {
 	Balance       uint64
 	Nonce         uint64
+	LastNonce     uint64
 	PublicKey     []byte
 	PublicKeyType string
 	mu            sync.RWMutex

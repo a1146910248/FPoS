@@ -55,12 +55,18 @@ func (n *Layer2Node) StartPeriodicTransaction() {
 					fmt.Printf("生成目标地址失败: %v\n", err)
 					continue
 				}
+				// 检查nonce是否以及被接纳
+				currentNonce := n.stateDB.GetNonce(fromAddress) + 1
+				lastNonce := n.stateDB.accounts[fromAddress].LastNonce
+				if currentNonce == lastNonce {
+					continue
+				}
 				// 创建一个新交易
 				tx := types.Transaction{
 					From:      fromAddress,
 					To:        toAddress, // 生成随机的目标地址
 					Value:     uint64(rand.Intn(10000000)),
-					Nonce:     n.stateDB.GetNonce(fromAddress) + 1,
+					Nonce:     currentNonce,
 					GasLimit:  types.GasLimit,
 					GasUsed:   types.TransferGas,
 					GasPrice:  types.GasPrice,
@@ -81,7 +87,8 @@ func (n *Layer2Node) StartPeriodicTransaction() {
 					fmt.Printf("签名交易失败: %v\n", err)
 					continue
 				}
-
+				// 更新最新发布的nonce
+				n.stateDB.accounts[tx.From].LastNonce = currentNonce
 				// 广播交易
 				if err := n.BroadcastTransaction(tx); err != nil {
 					fmt.Printf("广播交易失败: %v\n", err)

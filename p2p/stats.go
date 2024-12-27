@@ -30,6 +30,12 @@ type Stats struct {
 	node        *Layer2Node
 	ethClient   *ethereum.EthereumClient
 	electionMgr *consensus.ElectionManager
+
+	// 验证者相关
+	ValidatorCount       uint64
+	ActiveValidatorCount uint64
+	CurrentSequencer     string
+	CurrentProposers     []string
 }
 
 var globalStats *Stats
@@ -38,8 +44,9 @@ var once sync.Once
 func GetStats() *Stats {
 	once.Do(func() {
 		globalStats = &Stats{
-			activeUsers:   make(map[string]time.Time),
-			tpsUpdateTime: time.Now(),
+			activeUsers:      make(map[string]time.Time),
+			tpsUpdateTime:    time.Now(),
+			CurrentProposers: []string{},
 		}
 	})
 	return globalStats
@@ -51,6 +58,8 @@ func InitStats(node *Layer2Node, ethClient *ethereum.EthereumClient, electionMgr
 	stats.node = node
 	stats.ethClient = ethClient
 	stats.electionMgr = electionMgr
+	// 注册选举状态变更回调
+	electionMgr.SetStateChangeCallback(stats.handleElectionStateChange)
 }
 
 // UpdateActiveUser 更新活跃用户
@@ -58,6 +67,13 @@ func (s *Stats) UpdateActiveUser(address string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.activeUsers[address] = time.Now()
+}
+
+// 获取验证者相关统计信息
+func (s *Stats) GetValidatorStats() (total uint64, active uint64, sequencer string, proposers []string) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.ValidatorCount, s.ActiveValidatorCount, s.CurrentSequencer, s.CurrentProposers
 }
 
 // UpdateTxCount 更新交易计数
@@ -167,4 +183,20 @@ func getCommonAddress() (common.Address, error) {
 
 	address := common.HexToAddress(pubKeyHex)
 	return address, nil
+}
+
+// 处理选举状态变更
+func (s *Stats) handleElectionStateChange(
+	sequencer string,
+	proposers []string,
+	totalValidators uint64,
+	activeValidators uint64,
+) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.CurrentSequencer = sequencer
+	s.CurrentProposers = proposers
+	s.ValidatorCount = totalValidators
+	s.ActiveValidatorCount = activeValidators
 }

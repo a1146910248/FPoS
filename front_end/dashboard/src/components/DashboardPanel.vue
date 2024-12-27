@@ -95,6 +95,88 @@
             </div>
           </el-card>
         </el-col>
+
+        <el-col :span="24" class="card-col">
+          <el-card class="chain-info">
+            <template #header>
+              <div class="card-header">
+                <span>验证者信息</span>
+              </div>
+            </template>
+
+            <el-row :gutter="20">
+              <!-- 验证者统计 -->
+              <el-col :span="8">
+                <div class="validator-stats">
+                  <div class="info-item">
+                    <span>活跃验证者:</span>
+                    <el-tag type="success">{{ stats.active_validator_count || 0 }}</el-tag>
+                  </div>
+                  <div class="info-item">
+                    <span>总验证者:</span>
+                    <el-tag>{{ stats.validator_count || 0 }}</el-tag>
+                  </div>
+                </div>
+              </el-col>
+
+              <!-- 当前排序器 -->
+              <el-col :span="8">
+                <div class="sequencer-info">
+                  <div class="info-item">
+                    <span>当前排序器:</span>
+                    <el-tooltip
+                      :content="stats.current_sequencer"
+                      placement="top"
+                      effect="light"
+                    >
+                      <el-tag type="primary" class="address-tag">
+                        {{ displayAddress(stats.current_sequencer) }}
+                        <el-button
+                          class="copy-btn"
+                          type="primary"
+                          link
+                          @click.stop="copyToClipboard(stats.current_sequencer)"
+                        >
+                          <el-icon><CopyDocument /></el-icon>
+                        </el-button>
+                      </el-tag>
+                    </el-tooltip>
+                  </div>
+                </div>
+              </el-col>
+
+              <!-- 其他提案者 -->
+              <el-col :span="8">
+                <div class="proposers-info">
+                  <div class="info-item">
+                    <span>其他提案者:</span>
+                    <div class="proposer-list">
+                      <template v-for="(proposer, index) in otherProposers" :key="index">
+                        <el-tooltip
+                          :content="proposer"
+                          placement="top"
+                          effect="light"
+                        >
+                          <el-tag type="warning" class="proposer-tag">
+                            {{displayAddress( proposer )}}
+                            <el-button
+                              class="copy-btn"
+                              type="primary"
+                              link
+                              @click.stop="copyToClipboard(proposer)"
+                            >
+                              <el-icon><CopyDocument /></el-icon>
+                            </el-button>
+                          </el-tag>
+                        </el-tooltip>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+              </el-col>
+            </el-row>
+          </el-card>
+        </el-col>
       </el-row>
 
       <!-- 趋势图和交易列表行 -->
@@ -316,7 +398,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import * as echarts from 'echarts'
 import { getStats, getTransactions, subscribeToUpdates } from '@/http/http.dashboard'
 import type { StatsResp, Transaction } from '@/model/dashboardModel'
@@ -337,7 +419,11 @@ const stats = ref<StatsResp>({
   l1_blocks: 0,
   l2_blocks: 0,
   l1_balance: '',
-  l2_tps: 0
+  l2_tps: 0,
+  validator_count: 0,
+  active_validator_count: 0,
+  current_sequencer: '',
+  current_proposers: [],
 })
 
 // 深色模式
@@ -378,6 +464,14 @@ const getStatusTagType = (status: TransactionStatus): string => {
   }
   return types[status]
 }
+
+// 计算其他提案者（排除当前排序器）
+const otherProposers = computed(() => {
+  if (!stats.value.current_proposers) return []
+  return stats.value.current_proposers.filter(
+    proposer => proposer !== stats.value.current_sequencer
+  )
+})
 
 // 获取状态文本
 const getStatusText = (status: TransactionStatus): string => {
@@ -585,6 +679,27 @@ const subscribeUpdates = () => {
   }
 }
 
+// 添加窗口宽度监听
+const windowWidth = ref(window.innerWidth)
+
+// 监听窗口大小变化
+window.addEventListener('resize', () => {
+  windowWidth.value = window.innerWidth
+})
+
+// 计算是否需要格式化地址
+const shouldFormatAddress = computed(() => {
+  return windowWidth.value < 1400  // 可以根据需要调整这个阈值
+})
+
+// 动态地址显示方法
+const displayAddress = (address: string) => {
+  if (shouldFormatAddress.value) {
+    return formatAddress(address)
+  }
+  return address
+}
+
 
 // 生命周期钩子
 onMounted(() => {
@@ -705,7 +820,7 @@ onUnmounted(() => {
   padding: 24px;
   background-color: #f0f2f5;
   height: calc(100vh - 60px);
-  overflow-y: auto;
+  overflow-y: hidden;
 }
 
 /* 确保整个容器占满视口 */
@@ -776,6 +891,26 @@ html.dark {
   height: 400px;
   width: 100%;
 }
+.chart-card,
+.transaction-card {
+  height: calc(100% - 16px);  /* 减去margin-top的值 */
+}
+.data-row {
+  margin-top: 16px;    /* 与上方卡片的间距 */
+}
+/* 确保卡片内容紧凑 */
+:deep(.el-card__header) {
+  padding: 12px 16px;    /* 减小卡片头部内边距 */
+}
+
+:deep(.el-card__body) {
+  padding: 8px 16px;    /* 减小卡片内容内边距 */
+}
+
+/* 调整表格高度 */
+:deep(.el-table) {
+  height: 360px !important;  /* 与图表保持一致 */
+}
 
 .card-header {
   display: flex;
@@ -840,5 +975,65 @@ html.dark {
 :deep(.el-card__body) {
   flex: 1;
   overflow: hidden;
+}
+
+.validator-stats,
+.sequencer-info,
+.proposers-info {
+  padding: 12px;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.info-item:last-child {
+  margin-bottom: 0;
+}
+
+.proposer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.proposer-tag {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+}
+
+.copy-btn {
+  padding: 2px 4px;
+  margin-left: 4px;
+}
+
+.copy-btn:hover {
+  background-color: rgba(64, 158, 255, 0.1);
+}
+
+/* 暗色模式适配 */
+:deep(.dark) {
+  .validator-stats,
+  .sequencer-info,
+  .proposers-info {
+    background-color: var(--el-bg-color-overlay);
+  }
+}
+.card-col {
+  margin-top: 16px;
+}
+
+.address-tag {
+  max-width: none;  /* 移除最大宽度限制 */
+  white-space: normal;  /* 允许文本换行 */
+  word-break: break-all;  /* 在任意字符间换行 */
+  height: auto;  /* 自适应高度 */
+  line-height: 1.5;  /* 调整行高 */
+  padding: 4px 8px;  /* 调整内边距 */
 }
 </style>
