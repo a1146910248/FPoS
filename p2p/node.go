@@ -3,6 +3,7 @@ package p2p
 import (
 	"FPoS/config"
 	"FPoS/core/consensus"
+	"FPoS/core/dac"
 	"FPoS/core/ethereum"
 	"FPoS/pkg/logging"
 	"FPoS/types"
@@ -11,11 +12,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/libp2p/go-libp2p"
-	"github.com/multiformats/go-multiaddr"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/libp2p/go-libp2p"
+	"github.com/multiformats/go-multiaddr"
+	"github.com/spf13/viper"
 
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -29,9 +32,11 @@ import (
 )
 
 var (
-	globalNode *Layer2Node
-	nodeOnce   sync.Once
-	logger     = logging.GetLogger()
+	globalNode       *Layer2Node
+	nodeOnce         sync.Once
+	logger           = logging.GetLogger()
+	RotationInterval int
+	MinStakeAmount   uint64
 )
 
 // GetNode 获取全局节点实例
@@ -69,6 +74,8 @@ type Layer2Node struct {
 	stateDB                   *StateDB
 	electionMgr               *consensus.ElectionManager
 	periodicTxStarted         bool
+	dacMgr                    *dac.DACManager
+	isDACMember               bool
 }
 
 type P2PTopic struct {
@@ -79,6 +86,7 @@ type P2PTopic struct {
 	validatorTopic *pubsub.Topic
 	txStatTopic    *pubsub.Topic
 	blockVoteTopic *pubsub.Topic
+	dacTopic       *pubsub.Topic
 }
 
 const pubsubMaxSize = 1 << 22 // 4 MB
@@ -167,12 +175,17 @@ func NewLayer2Node(ctx context.Context, port int, bootstrapPeers []string, privK
 	}
 
 	// 初始化排序器管理器
+	RotationInterval = viper.GetInt("L2.RotationInterval")
+	MinStakeAmount = viper.GetUint64("L2.MinStakeAmount")
 	consensusConfig := &consensus.ConsensusConfig{
-		MinStakeAmount:   1000000,
-		RotationInterval: 60 * time.Second,
+		MinStakeAmount:   MinStakeAmount,
+		RotationInterval: time.Duration(RotationInterval) * time.Second,
 		ValidatorQuorum:  3,
 	}
 	node.electionMgr = consensus.NewElectionManager(node.ctx, consensusConfig)
+	// 初始化 DAC 管理器
+	node.initDACManager(consensusConfig)
+
 	return node, nil
 }
 func initState(node *Layer2Node, bootstrapPeers []string) error {
@@ -364,18 +377,24 @@ func (n *Layer2Node) Start() error {
 			fmt.Printf("Failed to sync state from peers: %s\n", err)
 		}
 	}
+
+	var consensusConfig *consensus.ConsensusConfig
 	// 如果是验证者节点，初始化共识
 	if len(n.bootstrapPeers) > 0 {
-		consensusConfig := &consensus.ConsensusConfig{
-			MinStakeAmount:   1000000,
-			RotationInterval: 60 * time.Second,
+		consensusConfig = &consensus.ConsensusConfig{
+			MinStakeAmount:   10000000,
+			RotationInterval: time.Duration(RotationInterval) * time.Second,
 			ValidatorQuorum:  3,
 		}
+		logger.Info(consensusConfig.RotationInterval)
 		//time.Sleep(2 * time.Second)
 		if err := n.InitConsensus(consensusConfig); err != nil {
 			panic(err)
 		}
 	}
+
+	// 启动DAC服务
+	n.StartDACService()
 	return nil
 }
 
@@ -480,4 +499,89 @@ func (n *Layer2Node) sendMessage(peer peer.ID, msg types.Message) error {
 	defer stream.Close()
 
 	return json.NewEncoder(stream).Encode(msg)
+}
+
+// 初始化 DAC 管理器
+func (n *Layer2Node) initDACManager(config *consensus.ConsensusConfig) {
+	n.dacMgr = dac.NewDACManager(n.ctx, config)
+	n.dacMgr.SetElectionManager(n.electionMgr)
+
+	// 设置状态变更回调
+	n.dacMgr.SetStateChangeCallback(func(members []string, total uint64, active uint64) {
+		// 处理 DAC 成员变更事件
+		// ...
+	})
+}
+
+func (n *Layer2Node) RegisterEthClient(config *config.Config) error {
+	ethClient, err := ethereum.NewEthereumClient(config.Ethereum)
+	if err != nil {
+		fmt.Printf("connect ethereum failed:" + err.Error())
+		return err
+	}
+	n.electionMgr.SetEth(ethClient)
+	return nil
+}
+
+// 注册为 DAC 成员
+func (n *Layer2Node) RegisterAsDACMember(stake uint64) error {
+	member, err := n.dacMgr.RegisterMember(n.publicKey, stake)
+	if err != nil {
+		return err
+	}
+
+	// 创建并广播成员加入消息
+	message, err := n.CreateDACMemberJoinMessage(member)
+	if err != nil {
+		logger.Warn("创建DAC成员加入消息失败: %v", err)
+		// 继续执行，不返回错误
+	} else {
+		if err := n.BroadcastDACMemberMessage(*message); err != nil {
+			logger.Warn("广播DAC成员加入消息失败: %v", err)
+			// 继续执行，不返回错误
+		}
+	}
+
+	n.isDACMember = true
+	return nil
+}
+
+// 启动 DAC 服务
+func (n *Layer2Node) StartDACService() {
+	if n.dacMgr != nil {
+		n.dacMgr.Start()
+
+		// 订阅 DAC 相关消息
+		n.subscribeToDACTopics()
+	}
+}
+
+// 初始化DAC相关处理器
+func (n *Layer2Node) initDACHandlers() {
+	// 确保已经订阅DAC主题
+	n.subscribeToDACTopics()
+
+	// 注册DAC相关处理器
+	n.pubsub.RegisterTopicValidator("dac_topic", func(ctx context.Context, p peer.ID, msg *pubsub.Message) bool {
+		// 验证消息有效性
+		var msgType struct {
+			Type MessageType `json:"type"`
+		}
+		if err := json.Unmarshal(msg.Data, &msgType); err != nil {
+			return false
+		}
+
+		// 验证消息类型
+		switch msgType.Type {
+		case DACStateRequest, DACStateResponse, DACProofRequest, DACProofResponse:
+			return true
+		default:
+			return false
+		}
+	}, pubsub.WithValidatorTimeout(3*time.Second))
+}
+
+// 获取DAC管理器
+func (n *Layer2Node) GetDACManager() *dac.DACManager {
+	return n.dacMgr
 }

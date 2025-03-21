@@ -1,6 +1,8 @@
 package p2p
 
 import (
+	"FPoS/core/consensus"
+	"FPoS/core/dac"
 	. "FPoS/types"
 	"encoding/json"
 	"fmt"
@@ -8,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/crypto"
 )
 
 func (n *Layer2Node) SetTransactionHandler(handler TransactionHandler) {
@@ -67,34 +70,34 @@ func (n *Layer2Node) defaultTxValidation(tx *Transaction) bool {
 	}
 
 	// 检查nonce值
-	currentNonce := n.stateDB.GetNonce(tx.From)
-	if tx.Nonce > currentNonce+1 {
-		fmt.Printf("Transaction nonce gap detected: current=%d, received=%d\n",
-			currentNonce, tx.Nonce)
-
-		// 触发交易同步
-		go func() {
-			n.mu.Lock()
-			if n.isSyncing {
-				n.mu.Unlock()
-				return
-			}
-			// 在接收到响应并且装载完后再解除锁定
-			n.isSyncing = true
-			n.mu.Unlock()
-
-			// 请求缺失的交易
-			if err := n.syncMissingTransactions(tx.From, currentNonce+1, tx.Nonce); err != nil {
-				fmt.Printf("Missing transactions sync failed: %v\n", err)
-			}
-
-		}()
-		return false
-	} else if tx.Nonce < currentNonce+1 {
-		fmt.Printf("Transaction nonce too low: expected %d, got %d\n",
-			currentNonce+1, tx.Nonce)
-		return false
-	}
+	//currentNonce := n.stateDB.GetNonce(tx.From)
+	//if tx.Nonce > currentNonce+1 {
+	//	fmt.Printf("Transaction nonce gap detected: current=%d, received=%d\n",
+	//		currentNonce, tx.Nonce)
+	//
+	//	// 触发交易同步
+	//	go func() {
+	//		n.mu.Lock()
+	//		if n.isSyncing {
+	//			n.mu.Unlock()
+	//			return
+	//		}
+	//		// 在接收到响应并且装载完后再解除锁定
+	//		n.isSyncing = true
+	//		n.mu.Unlock()
+	//
+	//		// 请求缺失的交易
+	//		if err := n.syncMissingTransactions(tx.From, currentNonce+1, tx.Nonce); err != nil {
+	//			fmt.Printf("Missing transactions sync failed: %v\n", err)
+	//		}
+	//
+	//	}()
+	//	return false
+	//} else if tx.Nonce < currentNonce+1 {
+	//	fmt.Printf("Transaction nonce too low: expected %d, got %d\n",
+	//		currentNonce+1, tx.Nonce)
+	//	return false
+	//}
 
 	// Gas和余额检查
 	if err := n.stateDB.ValidateTransaction(tx, n.minGasPrice); err != nil {
@@ -229,10 +232,10 @@ func (n *Layer2Node) validateTxForBlock(tx *Transaction, isHistoricalBlock bool,
 	myAddress, _ := PublicKeyToAddress(n.publicKey)
 	if !isHistoricalBlock {
 		if sequencerAddr == myAddress {
-			if _, exists := n.txPool.Load(tx.Hash); exists {
-				fmt.Println("本节点为排序器节点，但交易池中交易未正确清除")
-				return false
-			}
+			//if _, exists := n.txPool.Load(tx.Hash); exists {
+			//	fmt.Println("本节点为排序器节点，但交易池中交易未正确清除")
+			//	return false
+			//}
 		} else {
 			// 等待初始化和同步完成,未完全同步会导致找不到对应交易
 			for {
@@ -245,10 +248,10 @@ func (n *Layer2Node) validateTxForBlock(tx *Transaction, isHistoricalBlock bool,
 				}
 				time.Sleep(100 * time.Millisecond)
 			}
-			if _, exists := n.txPool.Load(tx.Hash); !exists {
-				fmt.Println("本节点为非排序器节点，但交易池中未含有该交易")
-				return false
-			}
+			//if _, exists := n.txPool.Load(tx.Hash); !exists {
+			//	fmt.Println("本节点为非排序器节点，但交易池中未含有该交易")
+			//	return false
+			//}
 		}
 	}
 
@@ -265,11 +268,11 @@ func (n *Layer2Node) validateTxForBlock(tx *Transaction, isHistoricalBlock bool,
 	}
 
 	// 检查 nonce 值,如果大于现在的 From 的 nonce 则不合法
-	currentNonce := n.stateDB.GetNonce(tx.From)
-	if !isHistoricalBlock && tx.Nonce > currentNonce+1 {
-		fmt.Printf("block交易nonce无效: 期望 %d, 实际 %d\n", currentNonce+1, tx.Nonce)
-		return false
-	}
+	//currentNonce := n.stateDB.GetNonce(tx.From)
+	//if !isHistoricalBlock && tx.Nonce > currentNonce+1 {
+	//	fmt.Printf("block交易nonce无效: 期望 %d, 实际 %d\n", currentNonce+1, tx.Nonce)
+	//	return false
+	//}
 
 	// Gas和余额检查
 	if err := n.stateDB.ValidateTransactionForBlock(tx, n.minGasPrice); err != nil {
@@ -638,4 +641,533 @@ func SignBlockVote(vote *BlockVote, node *Layer2Node) error {
 
 	vote.Signature = signature
 	return nil
+}
+
+// DAC 消息类型
+const (
+	DACStateRequest MessageType = iota + 100
+	DACStateResponse
+	DACProofRequest
+	DACProofResponse
+	DACMemberJoin
+	DACMemberLeave
+	DACMemberUpdate
+)
+
+// DAC 状态请求
+type DACStateReq struct {
+	Type      MessageType `json:"type"`
+	Address   string      `json:"address"`
+	RequestID string      `json:"request_id"`
+}
+
+// DAC 状态响应
+type DACStateRsp struct {
+	Type      MessageType `json:"type"`
+	RequestID string      `json:"request_id"`
+	Account   Account     `json:"account"`
+	Proof     [][]byte    `json:"proof"`
+}
+
+// DAC成员消息结构
+type DACMemberMessage struct {
+	Type      MessageType   `json:"type"`
+	RequestID string        `json:"request_id"`
+	Member    DACMemberData `json:"member"`
+	Signature []byte        `json:"signature"`
+}
+
+//// DACMemberBucketData 表示质押桶的传输友好形式
+//type DACMemberBucketData struct {
+//	ID            uint64   `json:"id"`
+//	StakeAmount   uint64   `json:"stake_amount"`
+//	MappedValue   *big.Int `json:"mapped_value_string,string"`
+//	CurrentWeight *big.Int `json:"current_weight_string,string"`
+//}
+
+// 扩展DACMemberData包含桶信息
+type DACMemberData struct {
+	Address        string                           `json:"address"`
+	PublicKeyBytes []byte                           `json:"public_key_bytes"`
+	Status         int                              `json:"status"`
+	StakeAmount    uint64                           `json:"stake_amount"`
+	JoinTime       time.Time                        `json:"join_time"`
+	DataProvided   uint64                           `json:"data_provided"`
+	LastActiveTime time.Time                        `json:"last_active_time"`
+	Buckets        map[uint64]consensus.StakeBucket `json:"buckets"`
+}
+
+// DAC状态同步请求
+type DACSyncReq struct {
+	Type        MessageType `json:"type"`
+	RequestID   string      `json:"request_id"`
+	CurrentTerm uint64      `json:"current_term"`
+}
+
+// DAC状态同步响应
+type DACSyncRsp struct {
+	Type           MessageType              `json:"type"`
+	RequestID      string                   `json:"request_id"`
+	CurrentMembers []string                 `json:"current_members"`
+	CurrentTerm    uint64                   `json:"current_term"`
+	LastRotation   time.Time                `json:"last_rotation"`
+	NextRotation   time.Time                `json:"next_rotation"`
+	Members        map[string]DACMemberData `json:"members"`
+}
+
+// DAC分片结构，用于大数据传输
+type DACSyncChunk struct {
+	Type        MessageType `json:"type"`
+	RequestID   string      `json:"request_id"`
+	ChunkIndex  int         `json:"chunk_index"`
+	TotalChunks int         `json:"total_chunks"`
+	Data        []byte      `json:"data"`
+	IsFinal     bool        `json:"is_final"`
+}
+
+// 处理 DAC 状态请求
+func (n *Layer2Node) handleDACStateRequest(msg *pubsub.Message) {
+	var req DACStateReq
+	if err := json.Unmarshal(msg.Data, &req); err != nil {
+		return
+	}
+
+	// 只有 DAC 成员才处理请求
+	if !n.isDACMember {
+		return
+	}
+
+	// 获取账户状态和证明
+	account, err := n.dacMgr.GetAccountState(req.Address)
+	if err != nil {
+		return
+	}
+
+	proof, err := n.dacMgr.GetAccountProof(req.Address)
+	if err != nil {
+		return
+	}
+
+	// 发送响应
+	resp := DACStateRsp{
+		Type:      DACStateResponse,
+		RequestID: req.RequestID,
+		Account:   *account,
+		Proof:     proof,
+	}
+
+	data, err := json.Marshal(resp)
+	if err != nil {
+		return
+	}
+
+	n.topic.dacTopic.Publish(n.ctx, data)
+}
+
+// 订阅DAC相关主题
+func (n *Layer2Node) subscribeToDACTopics() error {
+	var err error
+
+	// 检查是否已经订阅
+	if n.topic.dacTopic == nil {
+		return nil
+	}
+
+	// 订阅DAC消息
+	dacSub, err := n.topic.dacTopic.Subscribe()
+	if err != nil {
+		return fmt.Errorf("订阅DAC主题失败: %w", err)
+	}
+
+	// 处理DAC消息
+	go func() {
+		for {
+			msg, err := dacSub.Next(n.ctx)
+			if err != nil {
+				if n.ctx.Err() != nil {
+					// 上下文已取消，退出循环
+					return
+				}
+				logger.Errorf("获取DAC消息失败: %v", err)
+				continue
+			}
+
+			// 忽略自己发送的消息
+			if msg.ReceivedFrom == n.host.ID() {
+				continue
+			}
+
+			// 处理DAC消息
+			go n.handleDACMessage(msg)
+		}
+	}()
+
+	return nil
+}
+
+// 处理DAC消息
+func (n *Layer2Node) handleDACMessage(msg *pubsub.Message) {
+	// 解析消息类型
+	var msgData struct {
+		Type MessageType `json:"type"`
+	}
+
+	if err := json.Unmarshal(msg.Data, &msgData); err != nil {
+		logger.Errorf("解析DAC消息类型失败: %v", err)
+		return
+	}
+
+	// 根据消息类型分发处理
+	switch msgData.Type {
+	case DACStateRequest:
+		n.handleDACStateRequest(msg)
+	//case DACStateResponse:
+	//	n.handleDACStateResponse(msg)
+	//case DACProofRequest:
+	//	n.handleDACProofRequest(msg)
+	//case DACProofResponse:
+	//	n.handleDACProofResponse(msg)
+	case DACMemberJoin, DACMemberLeave, DACMemberUpdate:
+		n.handleDACMemberMessage(msg)
+	default:
+		logger.Warn("未知DAC消息类型: %v", msgData.Type)
+	}
+}
+
+// 处理DAC成员消息
+func (n *Layer2Node) handleDACMemberMessage(msg *pubsub.Message) {
+	var dacMsg DACMemberMessage
+	if err := json.Unmarshal(msg.Data, &dacMsg); err != nil {
+		logger.Errorf("解析DAC成员消息失败: %v", err)
+		return
+	}
+
+	// 验证消息签名
+	if !n.verifyDACMemberMessage(&dacMsg) {
+		logger.Warn("DAC成员消息签名验证失败")
+		return
+	}
+
+	// 将DACMemberData转换为DACMember
+	member, err := n.convertToDACMember(dacMsg.Member)
+	if err != nil {
+		logger.Errorf("转换DAC成员数据失败: %v", err)
+		return
+	}
+
+	// 根据消息类型处理
+	switch dacMsg.Type {
+	case DACMemberJoin:
+		if n.dacMgr.AddMember(member) {
+			logger.Infof("新DAC成员已加入: %s", member.Address)
+		}
+	case DACMemberLeave:
+		if n.dacMgr.RemoveMember(member.Address) {
+			logger.Infof("DAC成员已离开: %s", member.Address)
+		}
+	case DACMemberUpdate:
+		if n.dacMgr.UpdateMember(member) {
+			logger.Infof("DAC成员信息已更新: %s", member.Address)
+		}
+	}
+}
+
+// 验证DAC成员消息签名
+func (n *Layer2Node) verifyDACMemberMessage(message *DACMemberMessage) bool {
+	// 需要验证的数据
+	signData := struct {
+		Type      MessageType   `json:"type"`
+		RequestID string        `json:"request_id"`
+		Member    DACMemberData `json:"member"`
+	}{
+		Type:      message.Type,
+		RequestID: message.RequestID,
+		Member:    message.Member,
+	}
+
+	// 序列化数据
+	data, err := json.Marshal(signData)
+	if err != nil {
+		logger.Errorf("序列化验证数据失败: %v", err)
+		return false
+	}
+
+	// 从公钥字节恢复公钥
+	pubKey, err := crypto.UnmarshalPublicKey(message.Member.PublicKeyBytes)
+	if err != nil {
+		logger.Errorf("解析公钥失败: %v", err)
+		return false
+	}
+
+	// 验证签名
+	valid, err := pubKey.Verify(data, message.Signature)
+	if err != nil {
+		logger.Errorf("验证签名失败: %v", err)
+		return false
+	}
+
+	return valid
+}
+
+// 将DACMemberData转换为DACMember
+func (n *Layer2Node) convertToDACMember(data DACMemberData) (*dac.DACMember, error) {
+	// 从字节恢复公钥
+	pubKey, err := crypto.UnmarshalPublicKey(data.PublicKeyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("解析公钥失败: %w", err)
+	}
+
+	// 创建桶映射
+	buckets := make(map[uint64]*consensus.StakeBucket)
+	for id, bucketData := range data.Buckets {
+		bucket := &consensus.StakeBucket{
+			ID:            id,
+			StakeAmount:   bucketData.StakeAmount,
+			MappedValue:   bucketData.MappedValue,
+			CurrentWeight: bucketData.CurrentWeight,
+		}
+		buckets[id] = bucket
+	}
+
+	// 创建DACMember实例
+	member := &dac.DACMember{
+		Address:        data.Address,
+		PublicKey:      pubKey,
+		Status:         dac.DACMemberStatus(data.Status),
+		StakeAmount:    data.StakeAmount,
+		JoinTime:       data.JoinTime,
+		DataProvided:   data.DataProvided,
+		LastActiveTime: data.LastActiveTime,
+		Buckets:        buckets,
+	}
+
+	return member, nil
+}
+
+// 广播DAC成员消息
+func (n *Layer2Node) BroadcastDACMemberMessage(dacMsg DACMemberMessage) error {
+	// 序列化DAC消息
+	data, err := json.Marshal(dacMsg)
+	if err != nil {
+		return fmt.Errorf("序列化DAC成员消息失败: %w", err)
+	}
+
+	// 通过DAC主题发布消息
+	return n.topic.dacTopic.Publish(n.ctx, data)
+}
+
+// 创建DAC成员加入消息
+func (n *Layer2Node) CreateDACMemberJoinMessage(member *dac.DACMember) (*DACMemberMessage, error) {
+	if member == nil || member.PublicKey == nil {
+		return nil, fmt.Errorf("无效的DAC成员数据")
+	}
+
+	// 获取公钥字节
+	pubKeyBytes, err := crypto.MarshalPublicKey(member.PublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("序列化公钥失败: %w", err)
+	}
+
+	// 转换桶数据
+	buckets := make(map[uint64]consensus.StakeBucket)
+	for id, bucket := range member.Buckets {
+		bucketData := consensus.StakeBucket{
+			ID:            id,
+			StakeAmount:   bucket.StakeAmount,
+			MappedValue:   bucket.MappedValue,
+			CurrentWeight: bucket.CurrentWeight,
+		}
+		buckets[id] = bucketData
+	}
+
+	// 创建成员数据
+	memberData := DACMemberData{
+		Address:        member.Address,
+		PublicKeyBytes: pubKeyBytes,
+		Status:         int(member.Status),
+		StakeAmount:    member.StakeAmount,
+		JoinTime:       member.JoinTime,
+		DataProvided:   member.DataProvided,
+		LastActiveTime: member.LastActiveTime,
+		Buckets:        buckets, // 添加桶信息
+	}
+
+	// 创建消息
+	message := DACMemberMessage{
+		Type:      DACMemberJoin,
+		RequestID: uuid.New().String(),
+		Member:    memberData,
+	}
+
+	// 签名消息
+	if err := n.signDACMemberMessage(&message); err != nil {
+		return nil, err
+	}
+
+	return &message, nil
+}
+
+// 签名DAC成员消息
+func (n *Layer2Node) signDACMemberMessage(message *DACMemberMessage) error {
+	// 需要签名的数据
+	signData := struct {
+		Type      MessageType   `json:"type"`
+		RequestID string        `json:"request_id"`
+		Member    DACMemberData `json:"member"`
+	}{
+		Type:      message.Type,
+		RequestID: message.RequestID,
+		Member:    message.Member,
+	}
+
+	// 序列化数据
+	data, err := json.Marshal(signData)
+	if err != nil {
+		return fmt.Errorf("序列化签名数据失败: %w", err)
+	}
+
+	// 使用节点私钥签名
+	signature, err := n.privateKey.Sign(data)
+	if err != nil {
+		return fmt.Errorf("签名DAC成员消息失败: %w", err)
+	}
+
+	message.Signature = signature
+	return nil
+}
+
+// 更新DAC状态
+func (n *Layer2Node) updateDACState(resp DACSyncRsp) {
+	if n.dacMgr == nil {
+		logger.Error("DAC管理器未初始化")
+		return
+	}
+
+	// 将DACMemberData转换为DACMember
+	members := make(map[string]*dac.DACMember)
+	for addr, memberData := range resp.Members {
+		member, err := n.convertToDACMember(memberData)
+		if err != nil {
+			logger.Errorf("转换DAC成员数据失败: %v", err)
+			continue
+		}
+		members[addr] = member
+	}
+
+	// 更新DAC状态
+	state := &dac.DACState{
+		CurrentMembers:   resp.CurrentMembers,
+		CurrentTerm:      resp.CurrentTerm,
+		LastRotation:     resp.LastRotation,
+		NextRotationTime: resp.NextRotation,
+		Members:          members,
+		RotationInterval: n.dacMgr.GetState().RotationInterval, // 保持原有的轮换间隔
+	}
+
+	// 更新DAC管理器状态
+	n.dacMgr.SetState(state)
+
+	logger.Infof("已更新DAC状态: 当前任期=%d, 活跃成员数=%d", state.CurrentTerm, len(state.CurrentMembers))
+}
+
+// 创建DAC成员离开消息
+func (n *Layer2Node) CreateDACMemberLeaveMessage(member *dac.DACMember) (*DACMemberMessage, error) {
+	if member == nil || member.PublicKey == nil {
+		return nil, fmt.Errorf("无效的DAC成员数据")
+	}
+
+	// 获取公钥字节
+	pubKeyBytes, err := crypto.MarshalPublicKey(member.PublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("序列化公钥失败: %w", err)
+	}
+
+	// 转换桶数据
+	buckets := make(map[uint64]consensus.StakeBucket)
+	for id, bucket := range member.Buckets {
+		bucketData := consensus.StakeBucket{
+			ID:            id,
+			StakeAmount:   bucket.StakeAmount,
+			MappedValue:   bucket.MappedValue,
+			CurrentWeight: bucket.CurrentWeight,
+		}
+		buckets[id] = bucketData
+	}
+
+	// 创建成员数据
+	memberData := DACMemberData{
+		Address:        member.Address,
+		PublicKeyBytes: pubKeyBytes,
+		Status:         int(member.Status),
+		StakeAmount:    member.StakeAmount,
+		JoinTime:       member.JoinTime,
+		DataProvided:   member.DataProvided,
+		LastActiveTime: member.LastActiveTime,
+		Buckets:        buckets, // 添加桶信息
+	}
+
+	// 创建消息
+	message := DACMemberMessage{
+		Type:      DACMemberLeave,
+		RequestID: uuid.New().String(),
+		Member:    memberData,
+	}
+
+	// 签名消息
+	if err := n.signDACMemberMessage(&message); err != nil {
+		return nil, err
+	}
+
+	return &message, nil
+}
+
+// 创建DAC成员更新消息
+func (n *Layer2Node) CreateDACMemberUpdateMessage(member *dac.DACMember) (*DACMemberMessage, error) {
+	if member == nil || member.PublicKey == nil {
+		return nil, fmt.Errorf("无效的DAC成员数据")
+	}
+
+	// 获取公钥字节
+	pubKeyBytes, err := crypto.MarshalPublicKey(member.PublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("序列化公钥失败: %w", err)
+	}
+
+	// 转换桶数据
+	buckets := make(map[uint64]consensus.StakeBucket)
+	for id, bucket := range member.Buckets {
+		bucketData := consensus.StakeBucket{
+			ID:            id,
+			StakeAmount:   bucket.StakeAmount,
+			MappedValue:   bucket.MappedValue,
+			CurrentWeight: bucket.CurrentWeight,
+		}
+		buckets[id] = bucketData
+	}
+
+	// 创建成员数据
+	memberData := DACMemberData{
+		Address:        member.Address,
+		PublicKeyBytes: pubKeyBytes,
+		Status:         int(member.Status),
+		StakeAmount:    member.StakeAmount,
+		JoinTime:       member.JoinTime,
+		DataProvided:   member.DataProvided,
+		LastActiveTime: member.LastActiveTime,
+		Buckets:        buckets, // 添加桶信息
+	}
+
+	// 创建消息
+	message := DACMemberMessage{
+		Type:      DACMemberUpdate,
+		RequestID: uuid.New().String(),
+		Member:    memberData,
+	}
+
+	// 签名消息
+	if err := n.signDACMemberMessage(&message); err != nil {
+		return nil, err
+	}
+
+	return &message, nil
 }

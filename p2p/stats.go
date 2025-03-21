@@ -200,3 +200,14 @@ func (s *Stats) handleElectionStateChange(
 	s.ValidatorCount = totalValidators
 	s.ActiveValidatorCount = activeValidators
 }
+
+func (s *Stats) GetNumberOfValidatorBlockProduce() (map[string]uint64, map[string]uint64) {
+	// 示例公钥（以太坊公钥的格式：0x前缀的64个字符）
+	mapValidatorProduce := make(map[string]uint64)
+	mapValidatorParticipants := make(map[string]uint64)
+	for addr, validator := range s.electionMgr.Validators {
+		mapValidatorProduce[addr] = validator.BlocksProduced
+		mapValidatorParticipants[addr] = validator.BlocksParticipants
+	}
+	return mapValidatorProduce, mapValidatorParticipants
+}

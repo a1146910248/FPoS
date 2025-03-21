@@ -33,6 +33,14 @@ func (n *Layer2Node) processNewBlock(block Block, isHistoricalBlock bool) error 
 	n.stateRoot = block.StateRoot
 	n.blockCache.Store(block.Height, block)
 
+	// 同步更新DAC世界状态
+	if n.dacMgr != nil && n.isDACMember {
+		if err := n.dacMgr.SyncWorldState(n.stateDB, block); err != nil {
+			logger.Errorf("DAC世界状态同步失败: %v", err)
+			// 不中断主要流程，只记录错误
+		}
+	}
+
 	if n.sequencer != nil {
 		n.sequencer.blockHeight++
 	}
@@ -42,10 +50,61 @@ func (n *Layer2Node) processNewBlock(block Block, isHistoricalBlock bool) error 
 		n.electionMgr.OnBlockProduced(block.Height)
 	}
 
+	// 通知dac轮换
+	if n.dacMgr != nil {
+		n.dacMgr.OnBlockProduced(block.Height)
+	}
+
 	// 更新统计信息
 	stats := GetStats()
 	stats.UpdateBlockHeight(block.Height)
-	stats.UpdateTxCount(n.GetTotalTxCount()) // 需要实现此方法
+	stats.UpdateTxCount(n.GetTotalTxCount())
+	return nil
+}
+
+// 新增从StateDB同步到DAC状态树的方法
+func (n *Layer2Node) syncDACWorldState(block Block) error {
+	// 准备需要更新的账户集合
+	accountsToUpdate := make(map[string]Account)
+
+	// 收集所有相关账户
+	for _, tx := range block.Transactions {
+		// 收集发送方
+		senderAddr := tx.From
+		if _, exists := accountsToUpdate[senderAddr]; !exists {
+			accountsToUpdate[senderAddr] = Account{
+				Address: senderAddr,
+				Balance: n.stateDB.GetBalance(senderAddr),
+				Nonce:   n.stateDB.GetNonce(senderAddr),
+			}
+		}
+
+		// 收集接收方
+		receiverAddr := tx.To
+		if _, exists := accountsToUpdate[receiverAddr]; !exists {
+			accountsToUpdate[receiverAddr] = Account{
+				Address: receiverAddr,
+				Balance: n.stateDB.GetBalance(receiverAddr),
+				Nonce:   n.stateDB.GetNonce(receiverAddr),
+			}
+		}
+
+		// 存储交易到DAC交易树
+		if err := n.dacMgr.StoreTransaction(tx); err != nil {
+			return fmt.Errorf("存储交易到DAC失败: %w", err)
+		}
+	}
+
+	// 批量更新账户
+	accounts := make([]Account, 0, len(accountsToUpdate))
+	for _, account := range accountsToUpdate {
+		accounts = append(accounts, account)
+	}
+
+	if err := n.dacMgr.BatchUpdateAccounts(accounts); err != nil {
+		return fmt.Errorf("批量更新DAC账户失败: %w", err)
+	}
+
 	return nil
 }
 

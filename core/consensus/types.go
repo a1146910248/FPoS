@@ -33,17 +33,18 @@ type StakeBucket struct {
 
 // Validator 验证者信息
 type Validator struct {
-	Address        string                  `json:"address"`
-	PublicKey      crypto.PubKey           `json:"-"`          // 不直接序列化
-	PublicKeyBytes []byte                  `json:"public_key"` // 用于序列化的字段
-	Status         ValidatorStatus         `json:"status"`
-	StakeAmount    uint64                  `json:"stake_amount"`
-	JoinTime       time.Time               `json:"join_time"`
-	Buckets        map[uint64]*StakeBucket `json:"buckets"` // 桶ID到质押桶的映射
-	BlocksProduced uint64                  `json:"blocks_produced"`
-	LastBlockTime  time.Time               `json:"last_block_time"`
-	MissedBlocks   int                     `json:"missed_blocks"`
-	WeightScore    uint64                  `json:"weight_score"`
+	Address            string                  `json:"address"`
+	PublicKey          crypto.PubKey           `json:"-"`          // 不直接序列化
+	PublicKeyBytes     []byte                  `json:"public_key"` // 用于序列化的字段
+	Status             ValidatorStatus         `json:"status"`
+	StakeAmount        uint64                  `json:"stake_amount"`
+	JoinTime           time.Time               `json:"join_time"`
+	Buckets            map[uint64]*StakeBucket `json:"buckets"` // 桶ID到质押桶的映射
+	BlocksProduced     uint64                  `json:"blocks_produced"`
+	BlocksParticipants uint64                  `json:"blocks_participants"`
+	LastBlockTime      time.Time               `json:"last_block_time"`
+	MissedBlocks       int                     `json:"missed_blocks"`
+	WeightScore        uint64                  `json:"weight_score"`
 }
 
 // ConsensusConfig 共识配置

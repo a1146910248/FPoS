@@ -6,9 +6,12 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"github.com/libp2p/go-libp2p/core/crypto"
 	"runtime"
 	"sync"
+
+	"FPoS/core/dac"
+
+	"github.com/libp2p/go-libp2p/core/crypto"
 )
 
 // AccountState 账户状态
@@ -37,16 +40,17 @@ type PendingState struct {
 
 // StateSync 状态同步请求和响应的消息结构
 type StateSync struct {
-	Type         MessageType              `json:"type"`
-	RequestID    string                   `json:"requestId"`
-	FromHeight   uint64                   `json:"fromHeight"`
-	ToHeight     uint64                   `json:"toHeight"`
-	Accounts     map[string]*AccountState `json:"accounts"`
-	PendingState map[string]*PendingState `json:"pendingState,omitempty"`
-	PendingTxs   []types.Transaction      `json:"pendingTxs,omitempty"`
-	Blocks       []types.Block            `json:"blocks,omitempty"`
-	Validators   map[string]Validator     // 验证者列表
-	SelectState  ElectionState            // 选举管理器的状态
+	Type             MessageType              `json:"type"`
+	RequestID        string                   `json:"requestId"`
+	FromHeight       uint64                   `json:"fromHeight"`
+	ToHeight         uint64                   `json:"toHeight"`
+	Accounts         map[string]*AccountState `json:"accounts"`
+	PendingState     map[string]*PendingState `json:"pendingState,omitempty"`
+	PendingTxs       []types.Transaction      `json:"pendingTxs,omitempty"`
+	Blocks           []types.Block            `json:"blocks,omitempty"`
+	Validators       map[string]Validator     // 验证者列表
+	SelectState      ElectionState            // 选举管理器的状态
+	DacStateTransfer DACStateTransfer         `json:"dac_state_transfer"`
 }
 
 // NewStateDB 创建新的状态数据库
@@ -376,3 +380,9 @@ func getStackTrace() string {
 	n := runtime.Stack(stack, false)
 	return string(stack[:n])
 }
+
+// 在StateDB结构体定义处添加一行注释来确认接口实现
+// 确保StateDB实现了dac.StateProvider接口
+var _ dac.StateProvider = (*StateDB)(nil)
+
+// StateDB应该已经有GetBalance和GetNonce方法

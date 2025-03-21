@@ -87,6 +87,7 @@ func (n *Layer2Node) StartPeriodicTransaction() {
 					fmt.Printf("签名交易失败: %v\n", err)
 					continue
 				}
+				n.stateDB.mu.RLock()
 				// 更新最新发布的nonce
 				n.stateDB.accounts[tx.From].LastNonce = currentNonce
 				// 广播交易
@@ -94,6 +95,7 @@ func (n *Layer2Node) StartPeriodicTransaction() {
 					fmt.Printf("广播交易失败: %v\n", err)
 					continue
 				}
+				n.stateDB.mu.RUnlock()
 
 				//fmt.Printf("发送交易成功: %s\n", tx.Hash)
 			}

@@ -67,7 +67,7 @@ func (em *ElectionManager) SetState(state *ElectionState) {
 	em.state = state
 }
 
-// 设置状态变更回调
+// SetStateChangeCallback 设置状态变更回调
 func (em *ElectionManager) SetStateChangeCallback(callback func(string, []string, uint64, uint64)) {
 	em.onStateChange = callback
 }
@@ -125,6 +125,9 @@ func (em *ElectionManager) OnBlockProduced(height uint64) {
 	if validator, exists := em.Validators[currentSeq]; exists {
 		validator.BlocksProduced++
 		validator.LastBlockTime = time.Now()
+	}
+	for _, p := range em.state.CurrentProposers {
+		em.Validators[p].BlocksParticipants++
 	}
 }
 

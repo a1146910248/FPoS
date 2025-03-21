@@ -15,8 +15,8 @@ const (
 	MaxBucketStake = 1000000 // 每个桶的最大质押金额
 )
 
-// calculateMappedValue 计算固定的映射值 x_i = (s_i/MaxBucketStake) * (2^160-1)
-func calculateMappedValue(stakeAmount uint64) *big.Int {
+// CalculateMappedValue 计算固定的映射值 x_i = (s_i/MaxBucketStake) * (2^160-1)
+func CalculateMappedValue(stakeAmount uint64) *big.Int {
 	stake := new(big.Int).SetUint64(stakeAmount)
 	maxStake := new(big.Int).SetUint64(MaxBucketStake)
 
@@ -31,7 +31,7 @@ func calculateMappedValue(stakeAmount uint64) *big.Int {
 	return mappedValue
 }
 
-// RegisterValidator 修改注册逻辑
+// RegisterValidator 注册逻辑
 func (em *ElectionManager) RegisterValidator(pubKey crypto.PubKey, stake uint64) (*Validator, error) {
 	em.mu.Lock()
 	defer em.mu.Unlock()
@@ -48,7 +48,7 @@ func (em *ElectionManager) RegisterValidator(pubKey crypto.PubKey, stake uint64)
 		}
 		stake -= bucketStake
 
-		mappedValue := calculateMappedValue(bucketStake)
+		mappedValue := CalculateMappedValue(bucketStake)
 		buckets[i] = &StakeBucket{
 			ID:            i,
 			StakeAmount:   bucketStake,
@@ -94,7 +94,8 @@ func (em *ElectionManager) RotateSequencer() {
 	var weights []bucketWeight
 	// 人数不够共识，则等待下一轮
 	if len(activeValidators) < 3 {
-		fmt.Printf("validators number to low")
+		em.state.NextRotationTime = time.Now().Add(em.state.RotationInterval)
+		fmt.Printf("validators number to low\n")
 		return
 	}
 	// 计算所有桶的权重
@@ -148,27 +149,8 @@ func (em *ElectionManager) RotateSequencer() {
 		proposer.bucket.CurrentWeight = big.NewInt(0)
 	}
 
-	//// 找出权重最大的桶
-	//var maxWeight *big.Int
-	//var selectedBucket *StakeBucket
-	//var selectedValidator *Validator
-	//
-	//for _, bw := range weights {
-	//	// 更新为新的weight值
-	//	bw.bucket.CurrentWeight = bw.weight
-	//	if maxWeight == nil || bw.weight.Cmp(maxWeight) > 0 {
-	//		maxWeight = bw.weight
-	//		selectedBucket = bw.bucket
-	//		selectedValidator = bw.validator
-	//	}
-	//}
-	//
-	//// 重置选中的桶权重，其他桶权重保持不变
-	//selectedBucket.CurrentWeight = big.NewInt(0)
-
 	// 更新状态
 	now := time.Now()
-	//em.state.CurrentSequencer = selectedValidator.Address
 	em.state.CurrentTerm++
 	em.state.LastRotation = now
 	em.state.LastRandomNumber = fullRandom
@@ -182,19 +164,6 @@ func (em *ElectionManager) RotateSequencer() {
 
 	// 主排序器为权重最高的提案者
 	em.state.CurrentSequencer = topProposers[0].validator.Address
-
-	//fmt.Printf("New sequencer selected: %s (term=%d)\n"+
-	//	"Bucket ID: %d\n"+
-	//	"Bucket Stake: %d\n"+
-	//	"Final Weight: %s\n"+
-	//	"Next rotation at: %s\n",
-	//	selectedValidator.Address,
-	//	em.state.CurrentTerm,
-	//	selectedBucket.ID,
-	//	selectedBucket.StakeAmount,
-	//	maxWeight.String(),
-	//	em.state.NextRotationTime.Format(time.RFC3339),
-	//)
 
 	// 打印选举结果
 	fmt.Printf("New proposers selected for term %d:\n", em.state.CurrentTerm)

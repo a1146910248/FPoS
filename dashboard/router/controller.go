@@ -155,21 +155,24 @@ func (t HttpController) StreamUpdates(c *gin.Context) {
 			l2Blocks, l2TPS := stats.GetL2Stats()
 			// 获取验证者统计信息
 			validatorCount, activeValidatorCount, currentSequencer, currentProposers := stats.GetValidatorStats()
+			numberOfValidatorBlockProduce, numberOfValidatorParticipants := stats.GetNumberOfValidatorBlockProduce()
 
 			chainStats := ChainStats{
-				CurrentTPS:           stats.GetCurrentTPS(),
-				PeakTPS:              stats.GetPeakTPS(),
-				TotalTx:              stats.GetTotalTransactions(),
-				BlockHeight:          stats.GetCurrentHeight(),
-				ActiveUsers:          stats.GetActiveUsers(),
-				L1Blocks:             l1Blocks,
-				L2Blocks:             l2Blocks,
-				L1Balance:            l1Balance,
-				L2TPS:                l2TPS,
-				ValidatorCount:       validatorCount,
-				ActiveValidatorCount: activeValidatorCount,
-				CurrentSequencer:     currentSequencer,
-				CurrentProposers:     currentProposers,
+				CurrentTPS:                    stats.GetCurrentTPS(),
+				PeakTPS:                       stats.GetPeakTPS(),
+				TotalTx:                       stats.GetTotalTransactions(),
+				BlockHeight:                   stats.GetCurrentHeight(),
+				ActiveUsers:                   stats.GetActiveUsers(),
+				L1Blocks:                      l1Blocks,
+				L2Blocks:                      l2Blocks,
+				L1Balance:                     l1Balance,
+				L2TPS:                         l2TPS,
+				ValidatorCount:                validatorCount,
+				ActiveValidatorCount:          activeValidatorCount,
+				CurrentSequencer:              currentSequencer,
+				CurrentProposers:              currentProposers,
+				NumberOfValidatorBlockProduce: numberOfValidatorBlockProduce,
+				NumberOfValidatorParticipants: numberOfValidatorParticipants,
 			}
 
 			// 发送更新

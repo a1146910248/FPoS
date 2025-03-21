@@ -35,6 +35,15 @@ type Transaction struct {
 	Signature []byte    `json:"signature"`
 	StatLog   StatLog   `json:"stat_log"`
 }
+
+// Account 表示账户状态
+type Account struct {
+	Address         string `json:"address"`            // 账户地址
+	Balance         uint64 `json:"balance"`            // 账户余额
+	Nonce           uint64 `json:"nonce"`              // 账户交易次数
+	TxIndexRootHash string `json:"tx_index_root_hash"` // 交易索引根节点哈希
+}
+
 type StatLog struct {
 	Status      int       `json:"status"`       // 交易状态
 	BlockHash   string    `json:"block_hash"`   // 所属区块hash

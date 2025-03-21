@@ -2,14 +2,16 @@ package p2p
 
 import (
 	"FPoS/core/consensus"
+	"FPoS/core/dac"
 	. "FPoS/types"
 	"encoding/json"
 	"fmt"
-	"github.com/libp2p/go-libp2p/core/crypto"
 	"os"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/libp2p/go-libp2p/core/crypto"
 
 	"github.com/google/uuid"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -37,6 +39,16 @@ type StateChunk struct {
 	TotalChunks int         `json:"total_chunks"`
 	Data        []byte      `json:"data"`
 	IsFinal     bool        `json:"is_final"`
+}
+
+// DACStateTransfer DAC状态传输专用结构
+type DACStateTransfer struct {
+	CurrentMembers   []string                 `json:"current_members"`
+	CurrentTerm      uint64                   `json:"current_term"`
+	LastRotation     time.Time                `json:"last_rotation"`
+	NextRotationTime time.Time                `json:"next_rotation"`
+	RotationInterval time.Duration            `json:"rotation_interval"`
+	Members          map[string]DACMemberData `json:"members"`
 }
 
 func (n *Layer2Node) setupTopics() error {
@@ -85,6 +97,13 @@ func (n *Layer2Node) setupTopics() error {
 		return err
 	}
 	n.topic.blockVoteTopic = blockVoteTopic
+
+	// 创建 DAC 主题
+	dacTopic, err := n.pubsub.Join("dac_topic")
+	if err != nil {
+		return err
+	}
+	n.topic.dacTopic = dacTopic
 
 	go n.handleTxMessages()
 	go n.handleBlockMessages()
@@ -188,8 +207,8 @@ func (n *Layer2Node) handleTxMessages() {
 				stats := GetStats()
 				stats.UpdateActiveUser(tx.From)
 				stats.UpdateActiveUser(tx.To)
-				//fmt.Printf("Processed transaction directly: from=%s, nonce=%d\n",
-				//	tx.From, tx.Nonce)
+				fmt.Printf("Processed transaction directly: from=%s, nonce=%d\n",
+					tx.From, tx.Nonce)
 			}
 		}
 	}
@@ -561,7 +580,7 @@ func (n *Layer2Node) attemptStateSync() error {
 	// 等待响应或超时
 	select {
 	case resp := <-responseChan:
-		n.updateLocalState(resp.Accounts, resp.PendingTxs, resp.Blocks, resp.ToHeight, resp.Validators, resp.SelectState)
+		n.updateLocalState(resp.Accounts, resp.PendingTxs, resp.Blocks, resp.ToHeight, resp.Validators, resp.SelectState, resp.DacStateTransfer)
 		fmt.Printf("---------------------------------------------Successfully synced state from peers---------------------------------------------\n")
 		return nil
 	case <-timeout:
@@ -570,7 +589,7 @@ func (n *Layer2Node) attemptStateSync() error {
 }
 
 func (n *Layer2Node) updateLocalState(accounts map[string]*AccountState, pendingTxs []Transaction, blocks []Block,
-	newHeight uint64, validators map[string]consensus.Validator, selectState consensus.ElectionState) {
+	newHeight uint64, validators map[string]consensus.Validator, selectState consensus.ElectionState, dacStateTransfer DACStateTransfer) {
 	n.mu.Lock()
 	n.isSyncing = true
 	wasInitialized := n.initialized
@@ -714,6 +733,53 @@ func (n *Layer2Node) updateLocalState(accounts map[string]*AccountState, pending
 	//if len(n.electionMgr.Validators) == 1 {
 	//	n.electionMgr.RotateSequencer()
 	//}
+
+	// 同步DAC state
+	dacState := &dac.DACState{
+		CurrentMembers:   dacStateTransfer.CurrentMembers,
+		CurrentTerm:      dacStateTransfer.CurrentTerm,
+		LastRotation:     dacStateTransfer.LastRotation,
+		NextRotationTime: dacStateTransfer.NextRotationTime,
+		RotationInterval: dacStateTransfer.RotationInterval,
+		Members:          make(map[string]*dac.DACMember),
+	}
+
+	// 转换DACMemberData到DACMember
+	for addr, memberData := range dacStateTransfer.Members {
+		// 从字节恢复公钥
+		pubKey, err := crypto.UnmarshalPublicKey(memberData.PublicKeyBytes)
+		if err != nil {
+			logger.Errorf("解析DAC成员公钥失败: %v", err)
+			continue
+		}
+
+		// 转换桶数据
+		buckets := make(map[uint64]*consensus.StakeBucket)
+		for id, bucket := range memberData.Buckets {
+			bucketData := &consensus.StakeBucket{
+				ID:            id,
+				StakeAmount:   bucket.StakeAmount,
+				MappedValue:   bucket.MappedValue,
+				CurrentWeight: bucket.CurrentWeight,
+			}
+			buckets[id] = bucketData
+		}
+
+		member := &dac.DACMember{
+			Address:        addr,
+			PublicKey:      pubKey,
+			Status:         dac.DACMemberStatus(memberData.Status),
+			StakeAmount:    memberData.StakeAmount,
+			JoinTime:       memberData.JoinTime,
+			DataProvided:   memberData.DataProvided,
+			LastActiveTime: memberData.LastActiveTime,
+			Buckets:        buckets,
+		}
+
+		dacState.Members[addr] = member
+	}
+
+	n.dacMgr.SetState(dacState)
 	n.mu.Unlock()
 }
 
@@ -808,17 +874,69 @@ func (n *Layer2Node) handleStateSync(msg *pubsub.Message) {
 		}
 	}
 
+	// 获取DAC状态并转换为传输友好形式
+	origDacState := n.dacMgr.GetState()
+	dacStateTransfer := DACStateTransfer{
+		CurrentMembers:   origDacState.CurrentMembers,
+		CurrentTerm:      origDacState.CurrentTerm,
+		LastRotation:     origDacState.LastRotation,
+		NextRotationTime: origDacState.NextRotationTime,
+		RotationInterval: origDacState.RotationInterval,
+		Members:          make(map[string]DACMemberData),
+	}
+
+	// 转换DACMember到DACMemberData
+	for addr, member := range origDacState.Members {
+		// 跳过无效成员
+		if member.PublicKey == nil {
+			continue
+		}
+
+		// 获取公钥字节
+		pubKeyBytes, err := crypto.MarshalPublicKey(member.PublicKey)
+		if err != nil {
+			logger.Errorf("序列化DAC成员公钥失败: %v", err)
+			continue
+		}
+
+		// 转换桶数据
+		buckets := make(map[uint64]consensus.StakeBucket)
+		for id, bucket := range member.Buckets {
+			bucketData := consensus.StakeBucket{
+				ID:            id,
+				StakeAmount:   bucket.StakeAmount,
+				MappedValue:   bucket.MappedValue,
+				CurrentWeight: bucket.CurrentWeight,
+			}
+			buckets[id] = bucketData
+		}
+
+		memberData := DACMemberData{
+			Address:        addr,
+			PublicKeyBytes: pubKeyBytes,
+			Status:         int(member.Status),
+			StakeAmount:    member.StakeAmount,
+			JoinTime:       member.JoinTime,
+			DataProvided:   member.DataProvided,
+			LastActiveTime: member.LastActiveTime,
+			Buckets:        buckets, // 添加桶信息
+		}
+
+		dacStateTransfer.Members[addr] = memberData
+	}
+
 	response := &StateSync{
-		Type:         SyncResponse,
-		RequestID:    syncReq.RequestID,
-		Accounts:     accounts,
-		PendingState: pendingStates,
-		PendingTxs:   pendingTxs,
-		Blocks:       blocks,
-		FromHeight:   syncReq.FromHeight,
-		ToHeight:     n.latestBlock,
-		Validators:   n.electionMgr.GetValidators(),
-		SelectState:  n.electionMgr.GetState(),
+		Type:             SyncResponse,
+		RequestID:        syncReq.RequestID,
+		Accounts:         accounts,
+		PendingState:     pendingStates,
+		PendingTxs:       pendingTxs,
+		Blocks:           blocks,
+		FromHeight:       syncReq.FromHeight,
+		ToHeight:         n.latestBlock,
+		Validators:       n.electionMgr.GetValidators(),
+		SelectState:      n.electionMgr.GetState(),
+		DacStateTransfer: dacStateTransfer,
 	}
 
 	// 序列化完整响应

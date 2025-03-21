@@ -8,11 +8,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/spf13/viper"
 	"sync"
 	"time"
 )
 
-const _MaxBlockGasLimit_ = 810000
+//const _MaxBlockGasLimit_ = 810000
 
 type Sequencer struct {
 	node             *Layer2Node
@@ -37,7 +38,7 @@ func NewSequencer(node *Layer2Node, config *config.Config) (*Sequencer, error) {
 		node:        node,
 		blockHeight: 0,
 		//maxBlockGasLimit: 30_000_000, // 区块 gas 上限为 30,000,000
-		maxBlockGasLimit: _MaxBlockGasLimit_, // 区块 gas 上限为 30,000,000
+		maxBlockGasLimit: viper.GetUint64("L2.maxBlockGasLimit"), // 区块 gas 上限为 30,000,000
 		ethClient:        ethClient,
 		blockVoteChan:    make(chan types.BlockVote, 2),
 	}
