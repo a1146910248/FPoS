@@ -34,7 +34,7 @@ func (n *Layer2Node) processNewBlock(block Block, isHistoricalBlock bool) error 
 	n.blockCache.Store(block.Height, block)
 
 	// 同步更新DAC世界状态
-	if n.dacMgr != nil && n.isDACMember {
+	if n.dacMgr != nil && !n.isDACMember {
 		if err := n.dacMgr.SyncWorldState(n.stateDB, block); err != nil {
 			logger.Errorf("DAC世界状态同步失败: %v", err)
 			// 不中断主要流程，只记录错误
@@ -92,6 +92,15 @@ func (n *Layer2Node) syncDACWorldState(block Block) error {
 		// 存储交易到DAC交易树
 		if err := n.dacMgr.StoreTransaction(tx); err != nil {
 			return fmt.Errorf("存储交易到DAC失败: %w", err)
+		}
+	}
+
+	sqe := GetStats().CurrentSequencer
+	if _, exists := accountsToUpdate[sqe]; !exists {
+		accountsToUpdate[sqe] = Account{
+			Address: sqe,
+			Balance: n.stateDB.GetBalance(sqe),
+			Nonce:   n.stateDB.GetNonce(sqe),
 		}
 	}
 

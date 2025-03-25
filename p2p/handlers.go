@@ -652,6 +652,9 @@ const (
 	DACMemberJoin
 	DACMemberLeave
 	DACMemberUpdate
+	DACStateCommitReq
+	DACStateCommitResp
+	DACProofSubmit
 )
 
 // DAC 状态请求
@@ -821,14 +824,19 @@ func (n *Layer2Node) handleDACMessage(msg *pubsub.Message) {
 	switch msgData.Type {
 	case DACStateRequest:
 		n.handleDACStateRequest(msg)
-	//case DACStateResponse:
-	//	n.handleDACStateResponse(msg)
-	//case DACProofRequest:
-	//	n.handleDACProofRequest(msg)
-	//case DACProofResponse:
-	//	n.handleDACProofResponse(msg)
 	case DACMemberJoin, DACMemberLeave, DACMemberUpdate:
 		n.handleDACMemberMessage(msg)
+	case DACStateRootRequestType:
+		n.handleDACStateRootRequest(msg)
+	case DACStateRootResponseType:
+		n.handleDACStateRootResponse(msg)
+	case DACBlockCommitRequestType:
+		n.handleDACBlockCommitRequest(msg)
+	case DACBlockCommitResponseType:
+		n.handleDACBlockCommitResponse(msg)
+	case DACProofSubmitRequestType, DACProofSubmitResponseType:
+		// 处理证明提交相关消息
+		logger.Info("收到DAC证明提交相关消息")
 	default:
 		logger.Warn("未知DAC消息类型: %v", msgData.Type)
 	}

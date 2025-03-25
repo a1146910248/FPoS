@@ -4,7 +4,11 @@ import (
 	"FPoS/types"
 	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
 	"fmt"
+	"math/big"
+	"time"
+
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -12,8 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/event"
-	"math/big"
-	"time"
 )
 
 type EthereumConfig struct {
@@ -40,6 +42,14 @@ type TxStatusEvent struct {
 	Status      int
 	L1TxHash    string
 	L1Timestamp time.Time
+}
+
+// BlockMetadata 包含提交到Layer 1的区块元数据
+type BlockMetadata struct {
+	Block          *types.Block
+	DACAccountRoot string   // DAC账户状态根（十六进制字符串）
+	DACTxRoot      string   // DAC交易状态根（十六进制字符串）
+	DACProofs      [][]byte // DAC证明数据
 }
 
 func NewEthereumClient(config *EthereumConfig) (*EthereumClient, error) {
@@ -104,24 +114,29 @@ func (ec *EthereumClient) getTransactOpts() (*bind.TransactOpts, error) {
 
 // SubmitBlock 提交区块到L1
 func (ec *EthereumClient) SubmitBlock(block *types.Block) error {
+	// 创建简单的元数据，不包含DAC状态
+	metadata := &BlockMetadata{
+		Block: block,
+	}
+
 	auth, err := ec.getTransactOpts()
 	if err != nil {
 		return fmt.Errorf("failed to get transaction options: %v", err)
 	}
 	ec.statusChan <- TxStatusEvent{
-		Block:  *block,
+		Block:  *metadata.Block,
 		Status: types.TxStatusL1Submit,
 	}
 
 	// 将区块哈希和状态根转换为[32]byte
-	blockHash := common.HexToHash(block.Hash)
-	stateRoot := common.HexToHash(block.StateRoot)
+	blockHash := common.HexToHash(metadata.Block.Hash)
+	stateRoot := common.HexToHash(metadata.Block.StateRoot)
 
-	// 使用生成的合约方法
-	tx, err := ec.contract.SubmitBlock(auth, block.Height, blockHash, stateRoot)
+	// 使用生成的合约方法（只提交block，不包含DAC数据）
+	tx, err := ec.contract.SubmitBlock(auth, metadata.Block.Height, blockHash, stateRoot, [32]byte{}, [32]byte{})
 	if err != nil {
 		ec.statusChan <- TxStatusEvent{
-			Block:  *block,
+			Block:  *metadata.Block,
 			Status: types.TxStatusL1Failed,
 		}
 		return fmt.Errorf("failed to submit block: %v", err)
@@ -131,7 +146,7 @@ func (ec *EthereumClient) SubmitBlock(block *types.Block) error {
 	receipt, err := ec.waitForTransaction(tx.Hash())
 	if err != nil {
 		ec.statusChan <- TxStatusEvent{
-			Block:  *block,
+			Block:  *metadata.Block,
 			Status: types.TxStatusL1Failed,
 		}
 		return fmt.Errorf("failed to wait for transaction confirmation: %v", err)
@@ -139,17 +154,137 @@ func (ec *EthereumClient) SubmitBlock(block *types.Block) error {
 
 	if receipt.Status == 0 {
 		ec.statusChan <- TxStatusEvent{
-			Block:  *block,
+			Block:  *metadata.Block,
 			Status: types.TxStatusL1Failed,
 		}
 		return fmt.Errorf("transaction failed")
 	}
 	ec.statusChan <- TxStatusEvent{
-		Block:       *block,
+		Block:       *metadata.Block,
 		Status:      types.TxStatusL1Confirmed,
 		L1TxHash:    tx.Hash().String(),
 		L1Timestamp: time.Now(),
 	}
+	return nil
+}
+
+// 添加用于提交带DAC状态的区块的方法
+// SubmitBlockWithDAC 提交带DAC状态的区块到L1
+func (ec *EthereumClient) SubmitBlockWithDAC(block *types.Block, accountRootHex, txRootHex string, proofs [][]byte) error {
+	// 创建包含DAC状态的元数据
+	metadata := &BlockMetadata{
+		Block:          block,
+		DACAccountRoot: accountRootHex,
+		DACTxRoot:      txRootHex,
+		DACProofs:      proofs,
+	}
+
+	auth, err := ec.getTransactOpts()
+	if err != nil {
+		return fmt.Errorf("failed to get transaction options: %v", err)
+	}
+
+	ec.statusChan <- TxStatusEvent{
+		Block:  *metadata.Block,
+		Status: types.TxStatusL1Submit,
+	}
+
+	// 将区块哈希和状态根转换为[32]byte
+	blockHash := common.HexToHash(metadata.Block.Hash)
+	stateRoot := common.HexToHash(metadata.Block.StateRoot)
+
+	// 将十六进制字符串转换为字节数组
+	accountRootBytes, err := hex.DecodeString(accountRootHex)
+	if err != nil {
+		return fmt.Errorf("解析账户根失败: %w", err)
+	}
+
+	txRootBytes, err := hex.DecodeString(txRootHex)
+	if err != nil {
+		return fmt.Errorf("解析交易根失败: %w", err)
+	}
+
+	// 确保字节数组转为32字节格式
+	var accountRoot [32]byte
+	var txRoot [32]byte
+
+	// 正确处理长度问题 - 如果小于32字节，放在数组末尾
+	if len(accountRootBytes) <= 32 {
+		copy(accountRoot[32-len(accountRootBytes):], accountRootBytes)
+	} else {
+		// 如果超过32字节，取最后32字节
+		copy(accountRoot[:], accountRootBytes[len(accountRootBytes)-32:])
+	}
+
+	if len(txRootBytes) <= 32 {
+		copy(txRoot[32-len(txRootBytes):], txRootBytes)
+	} else {
+		copy(txRoot[:], txRootBytes[len(txRootBytes)-32:])
+	}
+
+	// 使用生成的合约方法
+	tx, err := ec.contract.SubmitBlock(auth, metadata.Block.Height, blockHash, stateRoot, accountRoot, txRoot)
+	if err != nil {
+		ec.statusChan <- TxStatusEvent{
+			Block:  *metadata.Block,
+			Status: types.TxStatusL1Failed,
+		}
+		return fmt.Errorf("failed to submit block with DAC: %v", err)
+	}
+
+	// 如果有证明，需要提交证明
+	//if len(proofs) > 0 {
+	//	// 等待区块提交确认后再提交证明
+	//	receipt, err := ec.waitForTransaction(tx.Hash())
+	//	if err != nil {
+	//		ec.statusChan <- TxStatusEvent{
+	//			Block:  *metadata.Block,
+	//			Status: types.TxStatusL1Failed,
+	//		}
+	//		return fmt.Errorf("failed to wait for transaction confirmation: %v", err)
+	//	}
+	//
+	//	if receipt.Status == 0 {
+	//		ec.statusChan <- TxStatusEvent{
+	//			Block:  *metadata.Block,
+	//			Status: types.TxStatusL1Failed,
+	//		}
+	//		return fmt.Errorf("block transaction failed")
+	//	}
+	//
+	//	// 使用新的交易选项提交证明
+	//	authProof, err := ec.getTransactOpts()
+	//	if err != nil {
+	//		return fmt.Errorf("failed to get transaction options for proof submission: %v", err)
+	//	}
+	//
+	//	// 调用合约方法提交证明
+	//	proofTx, err := ec.contract.SubmitDACProof(authProof, metadata.Block.Height, accountRoot, txRoot, proofs)
+	//	if err != nil {
+	//		return fmt.Errorf("failed to submit DAC proof: %v", err)
+	//	}
+	//
+	//	// 等待证明交易确认
+	//	proofReceipt, err := ec.waitForTransaction(proofTx.Hash())
+	//	if err != nil {
+	//		return fmt.Errorf("failed to wait for proof transaction confirmation: %v", err)
+	//	}
+	//
+	//	if proofReceipt.Status == 0 {
+	//		return fmt.Errorf("proof transaction failed")
+	//	}
+	//
+	//	fmt.Printf("DAC证明已提交到Layer 1: 区块高度=%d, 交易哈希=%s\n",
+	//		metadata.Block.Height, proofTx.Hash().String())
+	//}
+
+	ec.statusChan <- TxStatusEvent{
+		Block:       *metadata.Block,
+		Status:      types.TxStatusL1Confirmed,
+		L1TxHash:    tx.Hash().String(),
+		L1Timestamp: time.Now(),
+	}
+
 	return nil
 }
 
@@ -241,6 +376,62 @@ func (ec *EthereumClient) GetBalance(address common.Address) (*big.Int, error) {
 func (ec *EthereumClient) GetBlockNumber() (uint64, error) {
 	return ec.client.BlockNumber(context.Background())
 }
+
+// 获取DAC最新状态根并转换为字符串
+func (ec *EthereumClient) GetLatestDACRootsAsString() (acRootString string, txRootString string, err error) {
+	acRoot, txRoot, err := ec.contract.GetLatestDACRoots(&bind.CallOpts{})
+	if err != nil {
+		return "", "", fmt.Errorf("获取DAC状态根失败: %v", err)
+	}
+
+	// 将[32]byte转换为字符串（不带0x前缀）
+	acRootString = common.Bytes2Hex(acRoot[:])
+	txRootString = common.Bytes2Hex(txRoot[:])
+
+	return acRootString, txRootString, nil
+}
+
+//// 如果你需要带0x前缀的字符串
+//func (ec *EthereumClient) GetLatestDACRootsAsHexString() (string, string, error) {
+//	acRoot, txRoot, err := ec.contract.GetLatestDACRoots(&bind.CallOpts{})
+//	if err != nil {
+//		return "", "", fmt.Errorf("获取DAC状态根失败: %v", err)
+//	}
+//
+//	// 将[32]byte转换为带0x前缀的十六进制字符串
+//	acRootString := common.BytesToHash(acRoot[:]).Hex()
+//	txRootString := common.BytesToHash(txRoot[:]).Hex()
+//
+//	return acRootString, txRootString, nil
+//}
+
+//// 获取DAC最新状态根并转换为带0x前缀的字符串
+//func (ec *EthereumClient) GetLatestDACRootsAsHexutil() (string, string, error) {
+//	acRoot, txRoot, err := ec.contract.GetLatestDACRoots(&bind.CallOpts{})
+//	if err != nil {
+//		return "", "", fmt.Errorf("获取DAC状态根失败: %v", err)
+//	}
+//
+//	// 使用hexutil.Encode自动添加0x前缀
+//	acRootString := hexutil.Encode(acRoot[:])
+//	txRootString := hexutil.Encode(txRoot[:])
+//
+//	return acRootString, txRootString, nil
+//}
+//
+//// 获取DAC最新状态根并转换为普通字符串（无0x前缀）
+//func (ec *EthereumClient) GetLatestDACRootsWithEncodingHex() (string, string, error) {
+//	acRoot, txRoot, err := ec.contract.GetLatestDACRoots(&bind.CallOpts{})
+//	if err != nil {
+//		return "", "", fmt.Errorf("获取DAC状态根失败: %v", err)
+//	}
+//
+//	// 使用标准库encoding/hex
+//	acRootString := hex.EncodeToString(acRoot[:])
+//	txRootString := hex.EncodeToString(txRoot[:])
+//
+//	return acRootString, txRootString, nil
+//}
 
 // Close 关闭客户端连接
 func (ec *EthereumClient) Close() {

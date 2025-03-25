@@ -297,17 +297,19 @@ func (n *Layer2Node) GetAddrs() []string {
 
 func (n *Layer2Node) InitConsensus(config *consensus.ConsensusConfig) error {
 	// 加入验证者网络
-	validator, err := n.electionMgr.RegisterValidator(
-		n.publicKey,
-		config.MinStakeAmount,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to join as validator: %w", err)
-	}
-	// 广播加入
-	err = n.BroadcastValidatorJoin(*validator, consensus.ValidatorJoin)
-	if err != nil {
-		return err
+	if n.sequencer != nil {
+		validator, err := n.electionMgr.RegisterValidator(
+			n.publicKey,
+			config.MinStakeAmount,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to join as validator: %w", err)
+		}
+		// 广播加入
+		err = n.BroadcastValidatorJoin(*validator, consensus.ValidatorJoin)
+		if err != nil {
+			return err
+		}
 	}
 	// 开始管理器循环
 	n.electionMgr.Start()
@@ -395,6 +397,12 @@ func (n *Layer2Node) Start() error {
 
 	// 启动DAC服务
 	n.StartDACService()
+
+	// 添加DAC轮换监听
+	if n.dacMgr != nil {
+		go n.watchDACRotation()
+	}
+
 	return nil
 }
 
@@ -542,7 +550,6 @@ func (n *Layer2Node) RegisterAsDACMember(stake uint64) error {
 		}
 	}
 
-	n.isDACMember = true
 	return nil
 }
 
@@ -584,4 +591,30 @@ func (n *Layer2Node) initDACHandlers() {
 // 获取DAC管理器
 func (n *Layer2Node) GetDACManager() *dac.DACManager {
 	return n.dacMgr
+}
+
+// 监听DAC成员轮换
+func (n *Layer2Node) watchDACRotation() {
+	rotationCh := n.dacMgr.GetRotationChannel()
+	for members := range rotationCh {
+		n.mu.Lock()
+		// 检查本节点是否在新的DAC成员列表中
+		addr, _ := types.PublicKeyToAddress(n.publicKey)
+		isDAC := false
+		for _, member := range members {
+			if member == addr {
+				isDAC = true
+				break
+			}
+		}
+
+		// 更新节点DAC成员状态
+		n.isDACMember = isDAC
+		if isDAC {
+			fmt.Printf("节点 %s 成为DAC成员\n", addr)
+		} else {
+			fmt.Printf("节点 %s 不再是DAC成员\n", addr)
+		}
+		n.mu.Unlock()
+	}
 }

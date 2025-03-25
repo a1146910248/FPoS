@@ -5,12 +5,14 @@ import (
 	"FPoS/core/consensus"
 	"FPoS/core/ethereum"
 	"FPoS/types"
+	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/spf13/viper"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/spf13/viper"
 )
 
 //const _MaxBlockGasLimit_ = 810000
@@ -90,10 +92,6 @@ func (s *Sequencer) blockProducingLoop() {
 			s.mu.Unlock()
 
 			if isCurrentSeq && s.shouldProduceBlock() {
-				// 一旦当选应该立即置否以防止连续出块
-				s.node.mu.Lock()
-				s.node.isSequencer = false
-				s.node.mu.Unlock()
 				s.produceBlock()
 			}
 		}
@@ -176,6 +174,40 @@ func (s *Sequencer) produceBlock() {
 		return
 	}
 	block.Hash = blockHash
+
+	// 1. 请求DAC状态根
+	accountRoot, txRoot, err := s.node.RequestDACStateRoot()
+	if err != nil {
+		fmt.Printf("请求DAC状态根失败: %v\n", err)
+		return
+	}
+
+	// 2. 从Layer 1获取状态根
+	l1StateRoot, l1TxRoot, err := s.getLayer1StateRoot()
+	if err != nil {
+		fmt.Printf("获取Layer 1状态根失败: %v\n", err)
+		return
+	}
+
+	// 3. 验证DAC状态根与Layer 1状态根的一致性
+	stateIsValid := s.verifyStateRootConsistency(accountRoot, txRoot, l1StateRoot, l1TxRoot, block.Height)
+	if !stateIsValid {
+		logger.Warn("DAC状态根与Layer 1状态根不一致\n")
+		return
+	}
+
+	// 4. 提交区块到DAC网络并等待响应
+	dacProofs, newAccountRoot, newTxRoot, err := s.submitBlockAndWaitForProofs(block, l1StateRoot)
+	if err != nil {
+		fmt.Printf("获取DAC证明失败: %v，将继续提交区块\n", err)
+		// 即使DAC证明获取失败，也继续提交区块
+	}
+
+	// 一旦当选应该立即置否以防止连续出块
+	s.node.mu.Lock()
+	s.node.isSequencer = false
+	s.node.mu.Unlock()
+
 	// 收集投票
 	err = s.PubVoteReq(block)
 	if err != nil {
@@ -189,13 +221,11 @@ func (s *Sequencer) produceBlock() {
 		}
 	}
 
-	// 提交区块到L1
-	go func() {
-		if err := s.ethClient.SubmitBlock(&block); err != nil {
-			fmt.Printf("Failed to submit block to L1: %v\n", err)
-			// 不要因为L1提交失败而影响L2的共识
-		}
-	}()
+	// 5. 将区块和DAC证明一起提交到Layer 1
+	if err := s.submitBlockWithProofsToLayer1(block, newAccountRoot, newTxRoot, dacProofs); err != nil {
+		fmt.Printf("提交区块和证明到Layer 1失败: %v\n", err)
+		// 不中断区块链流程，只记录错误
+	}
 
 	// 广播区块
 	if err := s.node.BroadcastBlock(block); err != nil {
@@ -205,6 +235,28 @@ func (s *Sequencer) produceBlock() {
 
 	fmt.Printf("New block produced: height=%d, txs=%d, gasUsed=%d\n",
 		block.Height, len(block.Transactions), totalGas)
+}
+
+// 从Layer 1获取状态根
+func (s *Sequencer) getLayer1StateRoot() (ac string, tx string, err error) {
+	ac, tx, err = s.ethClient.GetLatestDACRootsAsString()
+	if err != nil {
+		return "", "", err
+	}
+
+	return ac, tx, nil
+}
+
+// 验证状态根一致性
+func (s *Sequencer) verifyStateRootConsistency(accountRoot, txRoot, l1StateRoot, l1TxRoot string, height uint64) bool {
+	if height == 1 {
+		return true
+	}
+	// 根据应用需求实现验证逻辑
+	if accountRoot == l1StateRoot && txRoot == l1TxRoot {
+		return true
+	}
+	return false // 示例实现
 }
 
 func (s *Sequencer) PubVoteReq(block types.Block) error {
@@ -229,5 +281,126 @@ func (s *Sequencer) PubVoteReq(block types.Block) error {
 		return fmt.Errorf("failed to publish tx sync request: %w", err)
 	}
 	logger.Info("等待收集投票")
+	return nil
+}
+
+// 提交区块到DAC并等待证明 - 修正版本
+func (s *Sequencer) submitBlockAndWaitForProofs(block types.Block, l1StateRoot string) ([][]byte, string, string, error) {
+	// 创建请求ID
+	requestID := uuid.New().String()
+
+	// 初始化响应收集
+	responseChannel := make(chan *DACBlockCommitResp, 1)
+
+	// 设置临时响应处理器
+	s.registerTempResponseHandler(requestID, responseChannel)
+
+	// 提交区块到DAC网络
+	if err := s.node.SubmitBlockToDACNetwork(requestID, block, l1StateRoot); err != nil {
+		return nil, "", "", fmt.Errorf("提交区块到DAC网络失败: %w", err)
+	}
+
+	// A. 设置超时
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	// B. 等待响应
+	select {
+	case resp := <-responseChannel:
+		// 使用读锁安全地访问响应数据
+		resp.mu.RLock()
+
+		// 找到第一个有效证明
+		var proofs [][]byte
+		for _, proof := range resp.proofs {
+			proofs = proof
+			break
+		}
+
+		// 获取根值
+		accountRoot := resp.newAccountRoot
+		txRoot := resp.newTxRoot
+
+		resp.mu.RUnlock()
+
+		return proofs, accountRoot, txRoot, nil
+
+	case <-ctx.Done():
+		return nil, "", "", fmt.Errorf("等待DAC证明超时")
+	}
+}
+
+// 注册临时响应处理器
+func (s *Sequencer) registerTempResponseHandler(requestID string, responseChannel chan<- *DACBlockCommitResp) {
+	go func() {
+		// 设置超时
+		timeout := time.After(5 * time.Second)
+		ticker := time.NewTicker(100 * time.Millisecond)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				// 检查是否有对应的响应
+				respValue, exists := blockCommitResponses.Load(requestID)
+				if !exists {
+					continue
+				}
+
+				resp := respValue.(*DACBlockCommitResp)
+
+				// 获取读锁
+				resp.mu.RLock()
+
+				// 获取DAC成员数量
+				dacState := s.node.dacMgr.GetState()
+				requiredResponses := len(dacState.CurrentMembers) * 2 / 3 // 2/3多数
+				responseCount := len(resp.responses)
+
+				// 检查是否有足够的响应
+				hasEnoughResponses := responseCount >= requiredResponses
+
+				// 释放读锁
+				resp.mu.RUnlock()
+
+				if hasEnoughResponses {
+					// 再次获取读锁进行一致性检查
+					resp.mu.RLock()
+					consistent := s.node.verifyBlockCommitConsistency(resp)
+					resp.mu.RUnlock()
+
+					if consistent {
+						// 发送到通道
+						responseChannel <- resp
+						return
+					}
+				}
+
+			case <-timeout:
+				// 超时退出
+				return
+			}
+		}
+	}()
+}
+
+// 将区块和DAC证明一起提交到Layer 1
+func (s *Sequencer) submitBlockWithProofsToLayer1(block types.Block, accountRoot, txRoot string, proofs [][]byte) error {
+	// 如果缺少证明，仍然提交区块
+	if len(proofs) == 0 || accountRoot == "" || txRoot == "" {
+		if err := s.ethClient.SubmitBlock(&block); err != nil {
+			return fmt.Errorf("提交区块到Layer 1失败: %w", err)
+		}
+		fmt.Printf("已提交区块到Layer 1（无DAC证明）: 区块高度=%d\n", block.Height)
+		return nil
+	}
+
+	// 调用Layer 1客户端提交带证明的区块
+	if err := s.ethClient.SubmitBlockWithDAC(&block, accountRoot, txRoot, proofs); err != nil {
+		return fmt.Errorf("提交区块和证明到Layer 1失败: %w", err)
+	}
+
+	fmt.Printf("已提交区块和DAC证明到Layer 1: 区块高度=%d, DAC状态根=%s\n",
+		block.Height, accountRoot)
 	return nil
 }

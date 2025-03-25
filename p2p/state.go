@@ -238,6 +238,7 @@ func (s *StateDB) RestorePendingState(tx *types.Transaction) {
 func (s *StateDB) ExecuteTransaction(tx *types.Transaction) error {
 	sender := s.GetAccount(tx.From)
 	receiver := s.GetAccount(tx.To)
+	sequencer := s.GetAccount(GetStats().CurrentSequencer)
 
 	// 锁定发送方和接收方账户
 	sender.mu.Lock()
@@ -257,6 +258,7 @@ func (s *StateDB) ExecuteTransaction(tx *types.Transaction) error {
 	// 更新账户状态
 	sender.Balance -= totalDeduction
 	receiver.Balance += tx.Value
+	sequencer.Balance += gasFee
 	sender.Nonce++
 
 	return nil

@@ -5,6 +5,7 @@ import (
 	"FPoS/core/merkle"
 	"FPoS/types"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -41,7 +42,7 @@ func NewDACManager(ctx context.Context, config *consensus.ConsensusConfig) *DACM
 	return &DACManager{
 		state: &DACState{
 			Members:          make(map[string]*DACMember),
-			RotationInterval: config.RotationInterval,
+			RotationInterval: config.RotationInterval - 10,
 			NextRotationTime: time.Now().Add(config.RotationInterval),
 		},
 		config:      config,
@@ -411,4 +412,21 @@ func (dm *DACManager) SetState(state *DACState) {
 
 	// 更新状态
 	dm.state = state
+}
+
+// GetAccountRoot 获取状态树根哈希
+func (dm *DACManager) GetAccountRoot() string {
+	root := dm.accountTree.GetRootHash()
+	return hex.EncodeToString(root)
+}
+
+// GetTxRoot 获取交易树根哈希
+func (dm *DACManager) GetTxRoot() string {
+	root := dm.txTree.GetRootHash()
+	return hex.EncodeToString(root)
+}
+
+// GetTxRoot 获取交易树根哈希
+func (dm *DACManager) GetRotationChannel() chan []string {
+	return dm.rotationCh
 }

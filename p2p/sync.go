@@ -207,8 +207,8 @@ func (n *Layer2Node) handleTxMessages() {
 				stats := GetStats()
 				stats.UpdateActiveUser(tx.From)
 				stats.UpdateActiveUser(tx.To)
-				fmt.Printf("Processed transaction directly: from=%s, nonce=%d\n",
-					tx.From, tx.Nonce)
+				//fmt.Printf("Processed transaction directly: from=%s, nonce=%d\n",
+				//	tx.From, tx.Nonce)
 			}
 		}
 	}
