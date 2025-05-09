@@ -430,3 +430,14 @@ func (dm *DACManager) GetTxRoot() string {
 func (dm *DACManager) GetRotationChannel() chan []string {
 	return dm.rotationCh
 }
+
+// 获取验证者相关统计信息
+func (dm *DACManager) GetDACStats() (total uint64, active uint64, dacs []string) {
+	dacs = make([]string, 0)
+	for k, _ := range dm.state.Members {
+		dacs = append(dacs, k)
+	}
+	dm.mu.RLock()
+	defer dm.mu.RUnlock()
+	return uint64(len(dm.state.Members)), uint64(len(dm.state.Members)), dacs
+}

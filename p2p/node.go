@@ -541,11 +541,11 @@ func (n *Layer2Node) RegisterAsDACMember(stake uint64) error {
 	// 创建并广播成员加入消息
 	message, err := n.CreateDACMemberJoinMessage(member)
 	if err != nil {
-		logger.Warn("创建DAC成员加入消息失败: %v", err)
+		logger.Errorf("创建DAC成员加入消息失败: %v", err)
 		// 继续执行，不返回错误
 	} else {
 		if err := n.BroadcastDACMemberMessage(*message); err != nil {
-			logger.Warn("广播DAC成员加入消息失败: %v", err)
+			logger.Errorf("广播DAC成员加入消息失败: %v", err)
 			// 继续执行，不返回错误
 		}
 	}

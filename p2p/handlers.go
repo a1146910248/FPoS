@@ -838,7 +838,7 @@ func (n *Layer2Node) handleDACMessage(msg *pubsub.Message) {
 		// 处理证明提交相关消息
 		logger.Info("收到DAC证明提交相关消息")
 	default:
-		logger.Warn("未知DAC消息类型: %v", msgData.Type)
+		logger.Errorf("未知DAC消息类型: %v", msgData.Type)
 	}
 }
 

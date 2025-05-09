@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	cmd "github.com/a1146910248/mixchain/cmd/mvmdebug"
 	"runtime"
 	"sync"
 
@@ -258,6 +259,40 @@ func (s *StateDB) ExecuteTransaction(tx *types.Transaction) error {
 	// 更新账户状态
 	sender.Balance -= totalDeduction
 	receiver.Balance += tx.Value
+	sequencer.Balance += gasFee
+	sender.Nonce++
+
+	return nil
+}
+
+// ExecuteContractTransaction 执行交易
+func (s *StateDB) ExecuteContractTransaction(tx *types.Transaction) error {
+	sender := s.GetAccount(tx.From)
+	normalAccount := cmd.GetNormalAccount()
+	contractAddress := cmd.GetContractAddress()
+	funcString := tx.FuncString
+	input := tx.Input
+	c_input := cmd.PackCode(funcString, input)
+	sequencer := s.GetAccount(GetStats().CurrentSequencer)
+
+	// 锁定发送方和接收方账户
+	sender.mu.Lock()
+	defer sender.mu.Unlock()
+
+	gasUsed, output := cmd.CallContract(normalAccount, contractAddress, c_input)
+	tx.Output = output
+	tx.ContractAddress = contractAddress.String()
+	// 计算gas费用
+	gasFee := (tx.GasUsed + gasUsed) * tx.GasPrice
+	totalDeduction := gasFee
+
+	// 再次检查余额（因为状态可能在验证后发生改变）
+	if sender.Balance < totalDeduction {
+		return fmt.Errorf("insufficient balance")
+	}
+
+	// 更新账户状态
+	sender.Balance -= totalDeduction
 	sequencer.Balance += gasFee
 	sender.Nonce++
 

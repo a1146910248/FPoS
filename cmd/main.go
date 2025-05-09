@@ -53,8 +53,10 @@ func main() {
 	}
 
 	// 添加DAC节点相关的命令行参数
-	isDACNode := flag.Bool("dac", false, "启动为DAC节点")
-	dacStake := flag.Uint64("dacstake", 10000, "设置DAC节点的质押金额")
+	//isDACNode := flag.Bool("dac", false, "启动为DAC节点")
+	isDACNode := true
+	//dacStake := flag.Uint64("dacstake", 10000, "设置DAC节点的质押金额")
+	dacStake := flag.Uint64("dacstake", 200000000, "设置DAC节点的质押金额")
 
 	// 解析命令行参数
 	flag.Parse()
@@ -90,7 +92,7 @@ func main() {
 		}
 
 		// 添加DAC节点启动逻辑
-		if *isDACNode {
+		if isDACNode {
 			// 注册为DAC成员并启动DAC服务
 			go func() {
 				// 等待节点初始化完成

@@ -142,14 +142,16 @@ func (s *Sequencer) produceBlock() {
 	proPub, _ := types.PublicKeyToAddress(s.node.publicKey)
 	// 创建新区块
 	block := types.Block{
-		Height:       s.node.latestBlock + 1,
-		Timestamp:    time.Now(),
-		Transactions: transactions,
-		StateRoot:    s.node.stateDB.GetStateRoot(),
-		TxRoot:       types.CalculateMerkleRoot(transactions),
-		Proposer:     proPub,
-		GasUsed:      totalGas, // 记录区块使用的总gas
-		GasLimit:     s.maxBlockGasLimit,
+		Height:        s.node.latestBlock + 1,
+		Timestamp:     time.Now(),
+		Transactions:  transactions,
+		StateRoot:     s.node.stateDB.GetStateRoot(),
+		TxRoot:        types.CalculateMerkleRoot(transactions),
+		Proposer:      proPub,
+		GasUsed:       totalGas, // 记录区块使用的总gas
+		GasLimit:      s.maxBlockGasLimit,
+		FinalProof:    mockPlonkProof().FinalProof,
+		KZGCommitment: mockKZGCommit().Commitment,
 	}
 	s.blockHeight = s.node.latestBlock
 	// 计算前一个区块的哈希
@@ -203,6 +205,17 @@ func (s *Sequencer) produceBlock() {
 		// 即使DAC证明获取失败，也继续提交区块
 	}
 
+	// 将交易保存到历史记录
+	for _, tx := range block.Transactions {
+		// 更新状态
+		if tx.StatLog.Status != types.TxStatusL1Confirmed && tx.StatLog.Status != types.TxStatusL1Failed {
+			tx.StatLog.Status = types.TxStatusConfirmed
+		}
+		tx.StatLog.BlockHash = blockHash
+		tx.StatLog.BlockHeight = block.Height
+		s.node.txHistory.Store(tx.Hash, tx)
+	}
+
 	// 一旦当选应该立即置否以防止连续出块
 	s.node.mu.Lock()
 	s.node.isSequencer = false
@@ -218,6 +231,9 @@ func (s *Sequencer) produceBlock() {
 		select {
 		case vote := <-s.blockVoteChan:
 			block.Votes = append(block.Votes, vote)
+			if !vote.Approve {
+				block.IsSus = true
+			}
 		}
 	}
 

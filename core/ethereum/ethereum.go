@@ -232,6 +232,23 @@ func (ec *EthereumClient) SubmitBlockWithDAC(block *types.Block, accountRootHex,
 		return fmt.Errorf("failed to submit block with DAC: %v", err)
 	}
 
+	// 等待交易确认
+	receipt, err := ec.waitForTransaction(tx.Hash())
+	if err != nil {
+		ec.statusChan <- TxStatusEvent{
+			Block:  *metadata.Block,
+			Status: types.TxStatusL1Failed,
+		}
+		return fmt.Errorf("failed to wait for transaction confirmation: %v", err)
+	}
+
+	if receipt.Status == 0 {
+		ec.statusChan <- TxStatusEvent{
+			Block:  *metadata.Block,
+			Status: types.TxStatusL1Failed,
+		}
+		return fmt.Errorf("transaction failed")
+	}
 	// 如果有证明，需要提交证明
 	//if len(proofs) > 0 {
 	//	// 等待区块提交确认后再提交证明

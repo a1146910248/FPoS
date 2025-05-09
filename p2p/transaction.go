@@ -103,6 +103,62 @@ func (n *Layer2Node) StartPeriodicTransaction() {
 	}()
 }
 
+var nonce = 0
+
+func (n *Layer2Node) CreateTransaction(tx *types.Transaction) *types.Transaction {
+	// 获取本节点的地址
+	fromAddress, err := types.PublicKeyToAddress(n.privateKey.GetPublic())
+	n.mu.RLock()
+	isSeq := n.isSequencer
+	n.mu.RUnlock()
+	if isSeq {
+		fmt.Printf("Skipping transaction generation for sequencer node\n")
+		return nil
+	}
+	if err != nil {
+		fmt.Printf("生成目标地址失败: %v\n", err)
+		return nil
+	}
+	// 检查nonce是否以及被接纳
+	currentNonce := n.stateDB.GetNonce(fromAddress) + 1
+	//lastNonce := n.stateDB.accounts[fromAddress].LastNonce
+	//if currentNonce == lastNonce {
+	//	return nil
+	//}
+	// 创建一个新交易
+	tx.From = fromAddress
+	//tx.Nonce = currentNonce
+	tx.Nonce = uint64(nonce) + 1
+	nonce++
+	// 交易初始状态
+	tx.StatLog.Status = types.TxStatusPending
+	// 计算交易哈希
+	hash, err := calculateTxHash(tx)
+	if err != nil {
+		fmt.Printf("计算交易哈希失败: %v\n", err)
+		return nil
+	}
+	tx.Hash = hash
+
+	// 签名交易
+	if err := SignTransaction(tx, n); err != nil {
+		fmt.Printf("签名交易失败: %v\n", err)
+		return nil
+	}
+	n.stateDB.mu.RLock()
+	// 更新最新发布的nonce
+	n.stateDB.accounts[tx.From].LastNonce = currentNonce
+	// 广播交易
+	if err := n.BroadcastTransaction(*tx); err != nil {
+		fmt.Printf("广播交易失败: %v\n", err)
+		return nil
+	}
+	n.stateDB.mu.RUnlock()
+	n.txPool.Store(tx.Hash, *tx)
+	fmt.Printf("发送交易成功: %s\n", tx.Hash)
+	return tx
+}
+
 // 添加签名方法
 func SignTransaction(tx *types.Transaction, node *Layer2Node) error {
 	// 使用节点的私钥对交易进行签名
@@ -325,6 +381,22 @@ func GetTransactions(limit int, offset int) []types.Transaction {
 		return []types.Transaction{}
 	}
 	return node.GetTransactions(limit, offset)
+}
+
+// GetTransaction 获取指定范围的交易
+func GetTransaction(key string) *types.Transaction {
+	node := GetNode()
+	if node != nil {
+		if tx, ok := node.txHistory.Load(key); ok {
+			t := tx.(types.Transaction)
+			return &t
+		}
+		if tx, ok := node.txPool.Load(key); ok {
+			t := tx.(types.Transaction)
+			return &t
+		}
+	}
+	return nil
 }
 
 // GetTotalTransactions 获取总交易数

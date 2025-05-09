@@ -5,6 +5,8 @@ import (
 	. "FPoS/dashboard/model"
 	"FPoS/p2p"
 	. "FPoS/pkg/logging"
+	"FPoS/types"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -29,6 +31,7 @@ func (t HttpController) GetStats(c *gin.Context) {
 	l2Blocks, l2TPS := stats.GetL2Stats()
 	// 获取验证者统计信息
 	validatorCount, activeValidatorCount, currentSequencer, currentProposers := stats.GetValidatorStats()
+	total, active, term, Dacs := stats.GetDACStats()
 
 	chainStats := ChainStats{
 		CurrentTPS:           stats.GetCurrentTPS(),
@@ -44,6 +47,11 @@ func (t HttpController) GetStats(c *gin.Context) {
 		ActiveValidatorCount: activeValidatorCount,
 		CurrentSequencer:     currentSequencer,
 		CurrentProposers:     currentProposers,
+
+		Dactotal:   total,
+		DacCurrent: active,
+		DacTerm:    term,
+		Dacs:       Dacs,
 	}
 
 	Success(c, chainStats)
@@ -156,6 +164,7 @@ func (t HttpController) StreamUpdates(c *gin.Context) {
 			// 获取验证者统计信息
 			validatorCount, activeValidatorCount, currentSequencer, currentProposers := stats.GetValidatorStats()
 			numberOfValidatorBlockProduce, numberOfValidatorParticipants := stats.GetNumberOfValidatorBlockProduce()
+			total, active, term, Dacs := stats.GetDACStats()
 
 			chainStats := ChainStats{
 				CurrentTPS:                    stats.GetCurrentTPS(),
@@ -173,6 +182,11 @@ func (t HttpController) StreamUpdates(c *gin.Context) {
 				CurrentProposers:              currentProposers,
 				NumberOfValidatorBlockProduce: numberOfValidatorBlockProduce,
 				NumberOfValidatorParticipants: numberOfValidatorParticipants,
+
+				Dactotal:   total,
+				DacCurrent: active,
+				DacTerm:    term,
+				Dacs:       Dacs,
 			}
 
 			// 发送更新
@@ -209,17 +223,19 @@ func (t HttpController) GetTransactions(c *gin.Context) {
 	txs := make([]Transaction, len(coreTxs))
 	for i, tx := range coreTxs {
 		txs[i] = Transaction{
-			Hash:      tx.Hash,
-			From:      tx.From,
-			To:        tx.To,
-			Value:     tx.Value,
-			Nonce:     tx.Nonce,
-			GasPrice:  tx.GasPrice,
-			GasLimit:  tx.GasLimit,
-			GasUsed:   tx.GasUsed,
-			Timestamp: tx.Timestamp,
-			Status:    tx.StatLog.Status,
-			BlockHash: tx.StatLog.BlockHash,
+			Hash:        tx.Hash,
+			From:        tx.From,
+			To:          tx.To,
+			Value:       tx.Value,
+			Nonce:       tx.Nonce,
+			GasPrice:    tx.GasPrice,
+			GasLimit:    tx.GasLimit,
+			GasUsed:     tx.GasUsed,
+			Timestamp:   tx.Timestamp,
+			Status:      tx.StatLog.Status,
+			BlockHash:   tx.StatLog.BlockHash,
+			BlockHeight: tx.StatLog.BlockHeight,
+			Method:      tx.IsContract,
 		}
 	}
 
@@ -227,4 +243,70 @@ func (t HttpController) GetTransactions(c *gin.Context) {
 		Total: int64(total),
 		List:  txs,
 	})
+}
+
+func (t HttpController) CreateTransactions(c *gin.Context) {
+	req := struct {
+		ToAddress       string `json:"to_address"`
+		Value           uint64 `json:"value"`
+		IsContract      bool   `json:"is_contract"`
+		ContractAddress string `json:"contract_address"`
+		Input           int64  `json:"input"`
+		GasLimit        uint64 `json:"gas_limit"`
+		FuncString      string `json:"func_string"`
+	}{}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Fail(c, "格式不正确，请求失败失败!")
+		return
+	}
+	tx := &types.Transaction{
+		To:              req.ToAddress, // 生成随机的目标地址
+		Value:           req.Value,
+		GasLimit:        req.GasLimit,
+		GasUsed:         types.TransferGas,
+		GasPrice:        types.GasPrice,
+		Timestamp:       time.Now(),
+		IsContract:      req.IsContract,
+		ContractAddress: req.ContractAddress,
+		Input:           req.Input,
+		FuncString:      req.FuncString,
+	}
+	node := p2p.GetNode()
+	newTx := node.CreateTransaction(tx)
+	if newTx != nil {
+		Success(c, newTx)
+	} else {
+		Fail(c, "交易创建失败！")
+	}
+}
+
+func (t HttpController) GetBlock(c *gin.Context) {
+	blockHash := c.PostForm("block_hash")
+	if blockHash == "" {
+		Fail(c, "传入hash为空")
+		return
+	}
+
+	num, err := strconv.ParseInt(blockHash, 10, 64) // 10 表示十进制，64 表示 int64
+	if err != nil {
+		fmt.Println("转换失败:", err)
+		return
+	}
+	// 获取原始交易数据
+	block := p2p.GetBlock(uint64(num))
+
+	Success(c, block)
+}
+
+func (t HttpController) GetTransaction(c *gin.Context) {
+	txHash := c.PostForm("tx_hash")
+	if txHash == "" {
+		Fail(c, "传入hash为空")
+		return
+	}
+
+	// 获取原始交易数据
+	block := p2p.GetTransaction(txHash)
+
+	Success(c, block)
 }

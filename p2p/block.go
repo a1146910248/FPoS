@@ -26,7 +26,7 @@ func (n *Layer2Node) processNewBlock(block Block, isHistoricalBlock bool) error 
 	}
 
 	// 使用新的方法原子性地处理交易池和待处理状态
-	n.cleanTxPoolAndPendingStates(block.Transactions, block.Hash)
+	n.cleanTxPoolAndPendingStates(block.Transactions, block.Hash, block.Height)
 
 	// 更新状态
 	n.latestBlock = block.Height
@@ -167,9 +167,16 @@ func (n *Layer2Node) RequestSync(fromHeight uint64) error {
 
 func (n *Layer2Node) applyTransactions(txs []Transaction) error {
 	for _, tx := range txs {
-		// 执行交易，更新账户状态
-		if err := n.stateDB.ExecuteTransaction(&tx); err != nil {
-			return fmt.Errorf("failed to execute transaction: %w", err)
+		if tx.IsContract {
+			// 执行合约交易，更新账户状态
+			if err := n.stateDB.ExecuteContractTransaction(&tx); err != nil {
+				return fmt.Errorf("failed to execute contract transaction: %w", err)
+			}
+		} else {
+			// 执行交易，更新账户状态
+			if err := n.stateDB.ExecuteTransaction(&tx); err != nil {
+				return fmt.Errorf("failed to execute transaction: %w", err)
+			}
 		}
 	}
 	return nil
@@ -316,7 +323,7 @@ func CalculateBlockHash(block *Block) (string, error) {
 	hash := sha256.Sum256(data)
 	return hex.EncodeToString(hash[:]), nil
 }
-func (n *Layer2Node) cleanTxPoolAndPendingStates(txs []Transaction, blockHash string) {
+func (n *Layer2Node) cleanTxPoolAndPendingStates(txs []Transaction, blockHash string, blockHeight uint64) {
 	n.stateDB.Lock()
 
 	// 创建交易 map 用于快速查找
@@ -370,8 +377,11 @@ func (n *Layer2Node) cleanTxPoolAndPendingStates(txs []Transaction, blockHash st
 	// 将交易保存到历史记录
 	for _, tx := range txs {
 		// 更新状态
-		tx.StatLog.Status = TxStatusConfirmed
+		if tx.StatLog.Status != TxStatusL1Confirmed && tx.StatLog.Status != TxStatusL1Failed {
+			tx.StatLog.Status = TxStatusConfirmed
+		}
 		tx.StatLog.BlockHash = blockHash
+		tx.StatLog.BlockHeight = blockHeight
 		n.txHistory.Store(tx.Hash, tx)
 	}
 }
@@ -390,12 +400,24 @@ func (n *Layer2Node) processNewBlockInternal(block Block, isHistoricalBlock bool
 	}
 
 	// 使用新的方法原子性地处理交易池和待处理状态
-	n.cleanTxPoolAndPendingStates(block.Transactions, block.Hash)
+	n.cleanTxPoolAndPendingStates(block.Transactions, block.Hash, block.Height)
 
 	// 更新状态
 	n.latestBlock = block.Height
 	n.stateRoot = block.StateRoot
 	n.blockCache.Store(block.Height, block)
 
+	return nil
+}
+
+// GetBlock 获取指定范围的交易
+func GetBlock(key uint64) *Block {
+	node := GetNode()
+	if node != nil {
+		if block, ok := node.blockCache.Load(key); ok {
+			b := block.(Block)
+			return &b
+		}
+	}
 	return nil
 }

@@ -76,6 +76,12 @@ func (s *Stats) GetValidatorStats() (total uint64, active uint64, sequencer stri
 	return s.ValidatorCount, s.ActiveValidatorCount, s.CurrentSequencer, s.CurrentProposers
 }
 
+// 获取验证者相关统计信息
+func (s *Stats) GetDACStats() (total int, active int, term uint64, proposers []string) {
+	dacState := s.node.dacMgr.GetState()
+	return len(dacState.Members), len(dacState.CurrentMembers), dacState.CurrentTerm, dacState.CurrentMembers
+}
+
 // UpdateTxCount 更新交易计数
 func (s *Stats) UpdateTxCount(count uint64) {
 	s.mu.Lock()

@@ -2,12 +2,15 @@
   <el-container>
     <el-header>
       <div class="header-container">
+
         <div class="header-left">
           <img src="@/assets/logo.png" alt="Logo" class="logo" />
           <h2 class="dashboard-title">Layer2 监控面板</h2>
         </div>
         <div class="header-right">
           <el-space :size="16" alignment="center">
+            <el-button type="primary" @click="navigateToSendTransaction">发送交易</el-button>
+
             <el-tag
               :type="wsConnected ? 'success' : 'danger'"
               size="large"
@@ -100,11 +103,26 @@
           <el-card class="chain-info">
             <template #header>
               <div class="card-header">
-                <span>验证者信息</span>
+                <div class="nav-tabs">
+                  <div
+                    class="tab-item"
+                    :class="{ 'active': activeTab === 'validator' }"
+                    @click="activeTab = 'validator'"
+                  >
+                    验证者信息
+                  </div>
+                  <div
+                    class="tab-item"
+                    :class="{ 'active': activeTab === 'dac' }"
+                    @click="activeTab = 'dac'"
+                  >
+                    DAC信息
+                  </div>
+                </div>
               </div>
             </template>
 
-            <el-row :gutter="20">
+            <el-row v-show="activeTab === 'validator'" :gutter="20">
               <!-- 验证者统计 -->
               <el-col :span="8">
                 <div class="validator-stats">
@@ -175,6 +193,60 @@
                 </div>
               </el-col>
             </el-row>
+
+            <el-row v-show="activeTab === 'dac'" :gutter="20">
+              <!-- 验证者统计 -->
+              <el-col :span="8">
+                <div class="validator-stats">
+                  <div class="info-item">
+                    <span>活跃DAC成员:</span>
+                    <el-tag type="success">{{ stats.dac_current || 0 }}</el-tag>
+                  </div>
+                  <div class="info-item">
+                    <span>总成员数:</span>
+                    <el-tag>{{ stats.dac_total || 0 }}</el-tag>
+                  </div>
+                </div>
+              </el-col>
+
+              <!-- 当前排序器 -->
+              <el-col :span="8">
+                <div class="info-item">
+                  <span>当前轮数:</span>
+                  <el-tag>{{ stats.dac_term || 0 }}</el-tag>
+                </div>
+              </el-col>
+
+              <!-- 其他提案者 -->
+              <el-col :span="8">
+                <div class="proposers-info">
+                  <div class="info-item">
+                    <span>DAC列表:</span>
+                    <div class="proposer-list">
+                      <template v-for="(proposer, index) in stats.dacs" :key="index">
+                        <el-tooltip
+                          :content="proposer"
+                          placement="top"
+                          effect="light"
+                        >
+                          <el-tag type="warning" class="proposer-tag">
+                            {{displayAddress( proposer )}}
+                            <el-button
+                              class="copy-btn"
+                              type="primary"
+                              link
+                              @click.stop="copyToClipboard(proposer)"
+                            >
+                              <el-icon><CopyDocument /></el-icon>
+                            </el-button>
+                          </el-tag>
+                        </el-tooltip>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+              </el-col>
+            </el-row>
           </el-card>
         </el-col>
       </el-row>
@@ -199,6 +271,15 @@
             <template #header>
               <div class="card-header">
                 <span>最新交易</span>
+                <el-input
+                  placeholder="输入交易哈希搜索"
+                  v-model="searchHash"
+                  @keyup.enter="searchTransaction"
+                  style="width: 200px; margin-right: 10px;"
+                />
+                <el-button type="primary" @click="searchTransaction">
+                  <el-icon><Search /></el-icon>
+                </el-button>
                 <el-button
                   :loading="loading"
                   type="primary"
@@ -226,7 +307,7 @@
                 <template #default="{ row }">
                   <div class="hash-container">
                     <el-tooltip :content="row.hash" placement="top" effect="light">
-                      <span class="hash-text">{{ formatHash(row.hash) }}</span>
+                      <span class="hash-text" @click="navigateToTransaction(row.hash)">{{ formatHash(row.hash) }}</span>
                     </el-tooltip>
                     <el-button
                       class="copy-btn"
@@ -248,13 +329,13 @@
                     :type="getMethodTagType(row.method)"
                     v-if="getMethodTagType(row.method)"
                   >
-                  {{ row.method || 'Transfer' }}
+                  {{ row.method ?  'Contract' : 'Transfer' }}
                   </el-tag>
                   <el-tag
                     size="small"
                     v-else
                   >
-                    {{ row.method || 'Transfer' }}
+                    {{ row.method ?  'Contract' : 'Transfer' }}
                   </el-tag>
                 </template>
               </el-table-column>
@@ -263,8 +344,8 @@
               <el-table-column prop="block" label="区块" width="160">
                 <template #default="{ row }">
                   <div class="hash-container">
-                    <el-tooltip :content="row.hash" placement="top" effect="light">
-                      <span class="hash-text">{{ formatHash(row.block_hash) }}</span>
+                    <el-tooltip :content="row.block_hash" placement="top" effect="light">
+                      <span class="hash-text" @click="navigateToBlock(row.block_height)">{{ formatHash(row.block_hash) }}</span>
                     </el-tooltip>
                     <el-button
                       class="copy-btn"
@@ -404,13 +485,15 @@ import { getStats, getTransactions, subscribeToUpdates } from '@/http/http.dashb
 import type { StatsResp, Transaction } from '@/model/dashboardModel'
 import { TransactionStatus } from '@/model/dashboardModel'
 import relativeTime from 'dayjs/plugin/relativeTime'
-import { Refresh, Connection, Setting, Moon, Sunny } from '@element-plus/icons-vue'
+import { Refresh, Connection, Setting, Moon, Sunny, Search } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
 import { ElMessage } from 'element-plus'
 import { useDark, useToggle } from '@vueuse/core'
+import { useRouter } from 'vue-router'
 
 // 基础数据
 const stats = ref<StatsResp>({
+  dac_current: 0, dac_term: 0, dac_total: 0, dacs: [],
   current_tps: 0,
   peak_tps: 0,
   total_tx: 0,
@@ -423,7 +506,7 @@ const stats = ref<StatsResp>({
   validator_count: 0,
   active_validator_count: 0,
   current_sequencer: '',
-  current_proposers: [],
+  current_proposers: []
 })
 
 // 深色模式
@@ -446,6 +529,21 @@ const total = ref(0)
 // 设置表格高度
 const tableHeight = 350 // 根据实际内容调整
 const pageSize = ref(15) // 默认显示15条
+
+// 搜索哈希值
+const searchHash = ref('')
+
+// 搜索交易
+const searchTransaction = () => {
+  if (searchHash.value) {
+    const hash = searchHash.value
+    router.push({ name: 'transactionDetail', params: { hash } })
+  } else {
+    ElMessage.warning('请输入交易哈希')
+  }
+}
+
+const activeTab = ref('validator')
 
 // 处理页面大小变化
 const handleSizeChange = (val: number) => {
@@ -719,7 +817,28 @@ onUnmounted(() => {
   if (chartInstance) {
     chartInstance.dispose()
   }
+
+  wsInstance?.close()
 })
+
+// 路由实例
+const router = useRouter()
+
+// 导航到发送交易页面
+const navigateToSendTransaction = () => {
+  router.push({ name: 'transaction' }) // 导航到发送交易页面
+}
+
+// 导航到交易详情页面
+const navigateToTransaction = (hash: string) => {
+  router.push({ name: 'transactionDetail', params: { hash } })
+}
+
+// 导航到区块详情页面
+const navigateToBlock = (block_hash: number) => {
+  router.push({ name: 'blockDetail', params: { block_hash } })
+}
+
 </script>
 
 <style scoped>
@@ -927,9 +1046,6 @@ html.dark {
   margin-right: 4px;
   transition: transform 0.3s ease;
 }
-.el-button:not(.is-loading):hover .el-icon {
-  transform: rotate(180deg);
-}
 
 .transaction-card :deep(.el-card__body) {
   padding: 0;
@@ -1035,5 +1151,33 @@ html.dark {
   height: auto;  /* 自适应高度 */
   line-height: 1.5;  /* 调整行高 */
   padding: 4px 8px;  /* 调整内边距 */
+}
+
+.nav-tabs {
+  display: flex;
+  gap: 20px;
+  cursor: pointer;
+}
+
+.tab-item {
+  padding: 8px 16px;
+  color: #606266;
+  transition: all 0.3s;
+  position: relative;
+}
+
+.tab-item.active {
+  color: #409eff;
+  font-weight: 500;
+}
+
+.tab-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: -10px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: #409eff;
 }
 </style>

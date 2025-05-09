@@ -22,6 +22,11 @@ type ChainStats struct {
 	CurrentProposers              []string          `json:"current_proposers"`
 	NumberOfValidatorBlockProduce map[string]uint64 `json:"number_of_validator_block_produce"`
 	NumberOfValidatorParticipants map[string]uint64 `json:"number_of_validator_participants"`
+
+	Dactotal   int      `json:"dac_total"`
+	DacCurrent int      `json:"dac_current"`
+	DacTerm    uint64   `json:"dac_term"`
+	Dacs       []string `json:"dacs"`
 }
 
 // TransactionList 交易列表响应结构
@@ -32,15 +37,17 @@ type TransactionList struct {
 
 // Transaction 交易信息结构
 type Transaction struct {
-	Hash      string    `json:"hash"`
-	From      string    `json:"from"`
-	To        string    `json:"to"`
-	Value     uint64    `json:"value"`
-	Nonce     uint64    `json:"nonce"`
-	GasPrice  uint64    `json:"gas_price"`
-	GasLimit  uint64    `json:"gas_limit"`
-	GasUsed   uint64    `json:"gas_used"`
-	Timestamp time.Time `json:"timestamp"`
-	Status    int       `json:"status"`     // 使用枚举值 0-4
-	BlockHash string    `json:"block_hash"` // 所属区块hash
+	Hash        string    `json:"hash"`
+	From        string    `json:"from"`
+	To          string    `json:"to"`
+	Value       uint64    `json:"value"`
+	Nonce       uint64    `json:"nonce"`
+	GasPrice    uint64    `json:"gas_price"`
+	GasLimit    uint64    `json:"gas_limit"`
+	GasUsed     uint64    `json:"gas_used"`
+	Timestamp   time.Time `json:"timestamp"`
+	Status      int       `json:"status"`     // 使用枚举值 0-4
+	BlockHash   string    `json:"block_hash"` // 所属区块hash
+	BlockHeight uint64    `json:"block_height"`
+	Method      bool      `json:"method"`
 }

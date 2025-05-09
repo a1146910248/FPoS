@@ -2,6 +2,7 @@ package types
 
 import (
 	"encoding/json"
+	bls12381 "github.com/kilic/bls12-381"
 	"time"
 )
 
@@ -23,17 +24,22 @@ const (
 
 // 交易结构
 type Transaction struct {
-	Hash      string    `json:"hash"`
-	From      string    `json:"from"`
-	To        string    `json:"to"`
-	Value     uint64    `json:"value"`
-	Nonce     uint64    `json:"nonce"`
-	GasPrice  uint64    `json:"gasPrice"` // 用户愿意支付的每单位gas的价格
-	GasLimit  uint64    `json:"gasLimit"` // 用户愿意支付的最大gas数量
-	GasUsed   uint64    `json:"gasUsed"`  // 实际使用的gas数量
-	Timestamp time.Time `json:"timestamp"`
-	Signature []byte    `json:"signature"`
-	StatLog   StatLog   `json:"stat_log"`
+	Hash            string    `json:"hash"`
+	From            string    `json:"from"`
+	To              string    `json:"to"`
+	Value           uint64    `json:"value"`
+	Nonce           uint64    `json:"nonce"`
+	GasPrice        uint64    `json:"gasPrice"` // 用户愿意支付的每单位gas的价格
+	GasLimit        uint64    `json:"gasLimit"` // 用户愿意支付的最大gas数量
+	GasUsed         uint64    `json:"gasUsed"`  // 实际使用的gas数量
+	Timestamp       time.Time `json:"timestamp"`
+	Signature       []byte    `json:"signature"`
+	StatLog         StatLog   `json:"stat_log"`
+	IsContract      bool      `json:"is_contract"`
+	ContractAddress string    `json:"contract_address"`
+	Input           int64     `json:"input"`
+	Output          int64     `json:"output"`
+	FuncString      string    `json:"func_string"`
 }
 
 // Account 表示账户状态
@@ -45,26 +51,32 @@ type Account struct {
 }
 
 type StatLog struct {
-	Status      int       `json:"status"`       // 交易状态
-	BlockHash   string    `json:"block_hash"`   // 所属区块hash
+	Status      int       `json:"status"`     // 交易状态
+	BlockHash   string    `json:"block_hash"` // 所属区块hash
+	BlockHeight uint64    `json:"block_height"`
 	L1TxHash    string    `json:"l1_tx_hash"`   // L1交易hash（如果已提交到L1）
 	L1Timestamp time.Time `json:"l1_timestamp"` // L1确认时间
 }
 
 // 区块结构
 type Block struct {
-	Height       uint64        `json:"height"`
-	Hash         string        `json:"hash"`
-	PreviousHash string        `json:"previousHash"`
-	Timestamp    time.Time     `json:"timestamp"`
-	Transactions []Transaction `json:"transactions"`
-	StateRoot    string        `json:"stateRoot"`
-	TxRoot       string        `json:"txRoot"` // 交易默克尔根
-	Proposer     string        `json:"proposer"`
-	GasUsed      uint64        `json:"gasUsed"`  // 区块中所有交易消耗的总gas
-	GasLimit     uint64        `json:"gasLimit"` // 区块gas上限
-	Votes        []BlockVote   `json:"votes"`
-	Signature    []byte        `json:"signature"`
+	Height         uint64            `json:"height"`
+	Hash           string            `json:"hash"`
+	PreviousHash   string            `json:"previousHash"`
+	Timestamp      time.Time         `json:"timestamp"`
+	Transactions   []Transaction     `json:"transactions"`
+	StateRoot      string            `json:"stateRoot"`
+	TxRoot         string            `json:"txRoot"` // 交易默克尔根
+	Proposer       string            `json:"proposer"`
+	GasUsed        uint64            `json:"gasUsed"`  // 区块中所有交易消耗的总gas
+	GasLimit       uint64            `json:"gasLimit"` // 区块gas上限
+	Votes          []BlockVote       `json:"votes"`
+	Signature      []byte            `json:"signature"`
+	IsSus          bool              `json:"is_sus"`
+	RootCommitment *bls12381.PointG1 `json:"root_commitment"`
+	PreviousRoot   *bls12381.PointG1 `json:"previous_root"`
+	FinalProof     []byte            `json:"final_proof"`    // 聚合证明
+	KZGCommitment  []byte            `json:"kzg_commitment"` // KZG承诺
 }
 
 // 投票结构

@@ -8,6 +8,9 @@ func (t HttpController) RegisterRouter(e *gin.RouterGroup) {
 		dashboard.GET("/stats", t.GetStats)
 		dashboard.GET("/ws", t.StreamUpdates)
 		dashboard.GET("/transactions", t.GetTransactions)
+		dashboard.POST("/postTransactions", t.CreateTransactions)
+		dashboard.POST("/getBlock", t.GetBlock)
+		dashboard.POST("/getTransaction", t.GetTransaction)
 		//dashboard.GET("/blocks", t.GetBlocks)
 	}
 }
